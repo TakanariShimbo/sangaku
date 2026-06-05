@@ -56,11 +56,10 @@ export class CelestialLayer {
     this.group.visible = v;
   }
 
-  /** 観測点(world)を中心に置き、カメラからの距離でスケール。毎フレーム呼ぶ。 */
-  place(center: THREE.Vector3, camDist: number): void {
+  /** 観測点(world)を中心に置き、ドーム半径(ワールド)でスケール。毎フレーム呼ぶ。 */
+  place(center: THREE.Vector3, radiusWorld: number): void {
     this.group.position.copy(center);
-    const r = THREE.MathUtils.clamp(camDist * 0.7, 5, 4000);
-    this.group.scale.setScalar(r / BASE_R);
+    this.group.scale.setScalar(radiusWorld / BASE_R);
   }
 
   /** sky・軌跡を反映。日時/観測点が変わった時だけ呼べばよい。 */

@@ -96,6 +96,13 @@ export class QuadtreeTerrain {
   private frame = 0;
   private active = 0;
   private maxAniso: number;
+  // 円盤クリップ用の共有ユニフォーム（全タイル材質が参照）。
+  // on=1 のとき、観測点 center から半径 radius(ワールド) の円の外側フラグメントを捨てる。
+  private clip = {
+    on: { value: 0 },
+    center: { value: new THREE.Vector2() },
+    radius: { value: 0 },
+  };
   // 現在ドレープしているベースマップ。setBasemap で切替（タイルを貼り直す）。
   private basemap: Basemap;
   // ベースマップ世代。切替時に +1 し、古い世代の読込結果は捨てる。
@@ -187,6 +194,13 @@ export class QuadtreeTerrain {
     fovScale: number,
   ): void {
     if (!frustum.intersectsBox(tile.box)) return; // 視錐台外＝描画しない（＝この領域は空ける）
+    // 円盤クリップ中は、円から外れたタイルはロードも描画もしない（タイル単位の粗いカリング）。
+    if (this.clip.on.value > 0.5) {
+      const c = this.clip.center.value;
+      const dx = Math.max(tile.box.min.x - c.x, 0, c.x - tile.box.max.x);
+      const dz = Math.max(tile.box.min.z - c.y, 0, c.y - tile.box.max.z);
+      if (Math.hypot(dx, dz) > this.clip.radius.value) return;
+    }
     tile.lastUsedFrame = this.frame;
 
     const wantRefine = tile.z < MAX_ZOOM && this.screenPx(tile, camPos, fovScale) > SPLIT_PX;
@@ -379,10 +393,47 @@ export class QuadtreeTerrain {
       });
     }
 
+    this.applyClipShader(material);
+
     const mesh = new THREE.Mesh(geo, material);
     mesh.position.set(xNW, 0, zNW);
     mesh.renderOrder = tile.z; // 深いタイルを後で描く（差し替え時のちらつき低減）
     return mesh;
+  }
+
+  /** 地形マテリアルに「観測点中心・半径Rの円の外側を捨てる」シェーダを注入。 */
+  private applyClipShader(material: THREE.MeshStandardMaterial): void {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uClipOn = this.clip.on;
+      shader.uniforms.uClipCenter = this.clip.center;
+      shader.uniforms.uClipRadius = this.clip.radius;
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec2 vClipXZ;")
+        .replace(
+          "#include <begin_vertex>",
+          "#include <begin_vertex>\n  vClipXZ = (modelMatrix * vec4(transformed, 1.0)).xz;",
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nvarying vec2 vClipXZ;\nuniform float uClipOn;\nuniform vec2 uClipCenter;\nuniform float uClipRadius;",
+        )
+        .replace(
+          "#include <clipping_planes_fragment>",
+          "#include <clipping_planes_fragment>\n  if (uClipOn > 0.5 && distance(vClipXZ, uClipCenter) > uClipRadius) discard;",
+        );
+    };
+  }
+
+  /** 地形を観測点中心・半径(ワールド)の円盤に切り抜く。null で解除（全面表示）。 */
+  setClip(center: { x: number; z: number } | null, radiusWorld: number): void {
+    if (!center) {
+      this.clip.on.value = 0;
+      return;
+    }
+    this.clip.on.value = 1;
+    this.clip.center.value.set(center.x, center.z);
+    this.clip.radius.value = radiusWorld;
   }
 
   private prune(): void {
