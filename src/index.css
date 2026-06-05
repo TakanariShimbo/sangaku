@@ -54,7 +54,7 @@ body,
 
 .attribution {
   position: absolute;
-  right: 8px;
+  left: 8px;
   bottom: max(8px, env(safe-area-inset-bottom, 8px));
   padding: 4px 8px;
   font-size: 11px;
@@ -62,4 +62,100 @@ body,
   background: rgba(10, 13, 18, 0.6);
   border-radius: 6px;
   pointer-events: none;
+}
+
+/* --- 画面ナビゲーション操作ボタン（右下） --- */
+.nav-controls {
+  position: absolute;
+  right: max(10px, env(safe-area-inset-right, 10px));
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.nav-row,
+.nav-zoom {
+  display: flex;
+  gap: 6px;
+}
+
+.nav-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  gap: 6px;
+}
+
+.nav-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.nav-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.nav-home {
+  grid-column: 2;
+  grid-row: 2;
+}
+.nav-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.nav-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.nav-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  color: #e6edf5;
+  background: rgba(18, 24, 33, 0.72);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.nav-btn:hover {
+  background: rgba(34, 46, 62, 0.85);
+}
+
+.nav-btn:active {
+  background: rgba(60, 110, 160, 0.9);
+  border-color: rgba(140, 190, 240, 0.7);
+}
+
+.nav-home {
+  font-size: 20px;
+  color: #aeb8c6;
+}
+
+/* 傾きアイコン（CSSのシェブロン） */
+.nav-ico {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+.nav-ico--tilt-down {
+  transform: rotate(45deg);
+  margin-top: -3px;
+}
+.nav-ico--tilt-up {
+  transform: rotate(-135deg);
+  margin-bottom: -3px;
 }
