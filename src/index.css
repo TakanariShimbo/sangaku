@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0d12;
+}
+
+.mapview {
+  position: fixed;
+  inset: 0;
+}
+
+.mapview-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.mapview-canvas canvas {
+  display: block;
+  touch-action: none; /* ピンチ/ドラッグをカメラ操作に使う */
+}
+
+.hud {
+  position: absolute;
+  top: env(safe-area-inset-top, 8px);
+  left: 8px;
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #aeb8c6;
+  background: rgba(10, 13, 18, 0.6);
+  border: 1px solid rgba(120, 140, 165, 0.18);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.hud span {
+  white-space: nowrap;
+}
+
+.attribution {
+  position: absolute;
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #93a0b0;
+  background: rgba(10, 13, 18, 0.6);
+  border-radius: 6px;
+  pointer-events: none;
+}
