@@ -60,6 +60,75 @@ body,
   z-index: 5;
 }
 
+/* --- 地図⇄カメラ視点トグル（上中央） --- */
+.mode-toggle {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 8px));
+  left: 50%;
+  transform: translateX(-50%);
+  height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(18, 24, 33, 0.78);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 20;
+}
+.mode-toggle:hover {
+  background: rgba(34, 46, 62, 0.85);
+}
+.mode-toggle.is-camera {
+  background: rgba(48, 100, 160, 0.92);
+  border-color: rgba(120, 180, 240, 0.65);
+  color: #fff;
+}
+
+/* --- カメラ視点HUD（下中央） --- */
+.cam-hud {
+  position: absolute;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  color: #e6edf5;
+  background: rgba(14, 19, 27, 0.86);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.cam-readout {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cam-eye {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #cdd6e2;
+}
+.cam-eye input[type="range"] {
+  width: 100%;
+  accent-color: #4f86c6;
+}
+.cam-hint {
+  font-size: 11px;
+  color: #8fa2bb;
+  text-align: center;
+}
+
 /* --- メニュー開閉ボタン（左上） --- */
 .menu-toggle {
   position: absolute;
