@@ -1,5 +1,6 @@
 // 山頂マーカー。全山頂（mountains.json）にオレンジの点を置き、タップ／クリックで選択した
-// 山だけ色を変える（複数選択可）。選択した山は名前ラベルを表示する（MapView 側で DOM 描画）。
+// 山だけ色を変える（複数選択可・選択は青）。山名ラベルは全山に表示し、選択した山は青で
+// 強調する（ラベルは MapView 側で DOM 描画）。カメラ視点では選択した山だけ残す。
 //
 // 座標系: X=東 / Y=上 / Z=南（mercator.ts と一致）。点サイズは sizeAttenuation:false で
 // 画面ピクセル固定。depthTest:false で常に地形の上に描き、地形の裏の山頂もタップできる。
@@ -76,13 +77,22 @@ export class PeakMarkers {
     return this.selected.size;
   }
 
+  /** 山頂の総数（ラベル生成・走査に使う）。 */
+  get count(): number {
+    return this.peaks.length;
+  }
+
   peakName(i: number): string {
     return this.peaks[i]?.name ?? "";
   }
 
-  /** 選択中の各山頂について (index, name, worldPos) を渡す。ラベル描画用。 */
-  forEachSelected(cb: (i: number, name: string, world: THREE.Vector3) => void): void {
-    for (const i of this.selected) cb(i, this.peaks[i].name, this.world[i]);
+  /** 山頂 i のワールド座標（Y は現在の VEX 反映済み）。ラベル投影に使う。 */
+  worldPos(i: number): THREE.Vector3 {
+    return this.world[i];
+  }
+
+  isSelected(i: number): boolean {
+    return this.selected.has(i);
   }
 
   /** 山頂データを流し込み、ジオメトリを構築。最初の有効化時に一度だけ呼べばよい。 */
