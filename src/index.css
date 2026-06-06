@@ -71,15 +71,22 @@ body,
 .peak-label {
   position: absolute;
   /* (left,top) は点の画面位置。点の真上に少しずらして表示する。 */
-  transform: translate(-50%, calc(-100% - 10px));
+  transform: translate(-50%, calc(-100% - 9px));
   white-space: nowrap;
-  padding: 2px 7px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  /* 全山名を出すので未選択は軽量に：背景なし＋濃い縁取りでどの地形でも読める。 */
+  color: #f3f6fb;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.8);
+}
+/* 選択中の山名は青チップで強調（点の青と対応）。 */
+.peak-label.is-selected {
+  padding: 2px 7px;
   color: #fff;
-  background: rgba(48, 100, 160, 0.94);
-  border: 1px solid rgba(120, 180, 240, 0.6);
+  background: rgba(48, 100, 160, 0.96);
+  border: 1px solid rgba(120, 180, 240, 0.7);
   border-radius: 7px;
+  text-shadow: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 

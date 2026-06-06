@@ -266,49 +266,59 @@ export default function MapView() {
     scene.add(skyDome.mesh);
     const sunDirWorld = new THREE.Vector3(0, 1, 0); // 直近の太陽方向（setCelestialSky で更新）
 
-    // 山頂マーカー（全山頂にグレーの点。タップで選択した山だけ色＋名前ラベルを出す）。
+    // 山頂マーカー（全山頂に点。タップで選択＝色が橙→青。名前ラベルは全山に常時表示）。
     const peaks = new PeakMarkers();
     scene.add(peaks.points);
-    // 選択中の山の名前ラベル（DOMオーバーレイ。毎フレーム画面座標へ投影して配置）。
+    // 山名ラベル（DOMオーバーレイ）。全山頂ぶんの要素を一度だけ作り、毎フレーム
+    // 画面に映っているものだけ表示・配置する（画面外は display:none で軽量化）。
     const peakLabelLayer = document.createElement("div");
     peakLabelLayer.className = "peak-label-layer";
     mount.appendChild(peakLabelLayer);
-    const peakLabels = new Map<number, HTMLDivElement>();
-    // 選択集合に合わせてラベル DOM を増減する（選択トグル／一括解除の後に呼ぶ）。
-    const syncPeakLabels = () => {
-      for (const [i, el] of peakLabels) {
-        if (!peaks.selected.has(i)) {
-          el.remove();
-          peakLabels.delete(i);
-        }
+    let peakLabelEls: HTMLDivElement[] = [];
+    // データ投入時に全山頂のラベル要素を生成（既存があれば作り直し）。
+    const buildPeakLabels = () => {
+      peakLabelLayer.replaceChildren();
+      peakLabelEls = new Array(peaks.count);
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < peaks.count; i++) {
+        const el = document.createElement("div");
+        el.className = "peak-label";
+        el.textContent = peaks.peakName(i);
+        el.style.display = "none";
+        frag.appendChild(el);
+        peakLabelEls[i] = el;
       }
-      peaks.forEachSelected((i, name) => {
-        if (!peakLabels.has(i)) {
-          const el = document.createElement("div");
-          el.className = "peak-label";
-          el.textContent = name;
-          peakLabelLayer.appendChild(el);
-          peakLabels.set(i, el);
-        }
-      });
+      peakLabelLayer.appendChild(frag);
     };
     const labelProj = new THREE.Vector3();
-    const positionPeakLabels = () => {
-      if (!peakLabels.size) return;
+    // 毎フレーム、ラベルを画面へ追従。地図モードは全山名を表示、カメラ視点では選択した
+    // 山だけ表示（未選択の点が隠れるのに合わせる）。画面外・カメラ後方は隠す。
+    const updatePeakLabels = () => {
+      if (!peakLabelEls.length) return;
       const w = mount.clientWidth;
       const h = mount.clientHeight;
-      peaks.forEachSelected((i, _name, world) => {
-        const el = peakLabels.get(i);
-        if (!el) return;
-        labelProj.copy(world).project(camera);
-        if (labelProj.z <= 1) {
+      const onlySelected = cameraMode; // カメラ視点では選択した山だけ
+      for (let i = 0; i < peakLabelEls.length; i++) {
+        const el = peakLabelEls[i];
+        const sel = peaks.isSelected(i);
+        if (onlySelected && !sel) {
+          if (el.style.display !== "none") el.style.display = "none";
+          continue;
+        }
+        labelProj.copy(peaks.worldPos(i)).project(camera);
+        const onScreen =
+          labelProj.z <= 1 &&
+          labelProj.x >= -1.05 && labelProj.x <= 1.05 &&
+          labelProj.y >= -1.05 && labelProj.y <= 1.05;
+        if (onScreen) {
           el.style.display = "block";
           el.style.left = `${(labelProj.x * 0.5 + 0.5) * w}px`;
           el.style.top = `${(-labelProj.y * 0.5 + 0.5) * h}px`;
-        } else {
-          el.style.display = "none"; // カメラ後方は隠す
+          if (sel !== el.classList.contains("is-selected")) el.classList.toggle("is-selected", sel);
+        } else if (el.style.display !== "none") {
+          el.style.display = "none";
         }
-      });
+      }
     };
 
     // 視点フリーモード: ON の間は地形LOD・円盤・太陽月を凍結し、カメラだけ動かせる。
@@ -460,10 +470,12 @@ export default function MapView() {
         peaks.setVisible(on);
         peakLabelLayer.style.display = on ? "block" : "none"; // 非表示時はラベルも隠す（選択は保持）
       },
-      setPeaksData: (data) => peaks.setData(data),
+      setPeaksData: (data) => {
+        peaks.setData(data);
+        buildPeakLabels(); // 全山頂ぶんの名前ラベル要素を作る
+      },
       clearPeakSelection: () => {
-        peaks.clearSelection();
-        syncPeakLabels();
+        peaks.clearSelection(); // ラベルの選択強調は次フレームの updatePeakLabels で反映
       },
     };
 
@@ -542,8 +554,7 @@ export default function MapView() {
       const rect = renderer.domElement.getBoundingClientRect();
       const i = peaks.pick(e.clientX - rect.left, e.clientY - rect.top, camera, mount.clientWidth, mount.clientHeight);
       if (i == null) return;
-      peaks.toggle(i);
-      syncPeakLabels();
+      peaks.toggle(i); // 色(橙↔青)が変わる。ラベルの選択強調は次フレームで反映
       setPeakSelCount(peaks.selectedCount);
     };
     renderer.domElement.addEventListener("pointerdown", onTapDown);
@@ -651,7 +662,7 @@ export default function MapView() {
         skyDome.setSunDir(sunDirWorld);
         skyDome.place(camera.position);
         terrain.update(camera, mount.clientHeight, 30);
-        positionPeakLabels(); // 選択中の山名ラベルを画面へ追従
+        updatePeakLabels(); // 山名ラベルを画面へ追従（地図=全山 / カメラ=選択のみ）
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
         return;
@@ -685,7 +696,7 @@ export default function MapView() {
         }
         terrain.update(camera, mount.clientHeight, camDist);
       }
-      positionPeakLabels(); // 選択中の山名ラベルを画面へ追従
+      updatePeakLabels(); // 山名ラベルを画面へ追従（地図=全山 / カメラ=選択のみ）
 
       // 中心レティクルは「マップの中心」を、その地点の地形表面の高さに置いて画面投影。
       // （Y=0の海面ではなく地表に合わせる＝斜め視点でも山頂などにピタリ合う）
