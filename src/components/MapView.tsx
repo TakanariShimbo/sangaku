@@ -1665,15 +1665,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       )}
 
       {/* 写真取り込み input（モード非依存で1つだけ。地図/カメラ両方の入口から呼ぶ） */}
-      {/* accept は image/* ではなく拡張子指定。Android で「ファイル選択」が開き EXIF(GPS) が
-          保たれる（image/* だとフォトピッカーが開き位置情報が削られることがある）。 */}
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
-        hidden
-        onChange={onPickPhoto}
-      />
+      {/* accept を付けない＝Android でフォトピッカー(画像専用・位置情報を削る)ではなく
+          ファイル(ドキュメント)選択が開き、EXIF(GPS)が保たれる。画像以外は onPickPhoto で弾く。 */}
+      <input ref={photoInputRef} type="file" hidden onChange={onPickPhoto} />
 
       {/* ① 写真選択フェーズ */}
       {appMode === "ar" && arStep === "upload" && (
