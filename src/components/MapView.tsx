@@ -1088,9 +1088,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     arStepRef.current = arStep;
   }, [arStep]);
 
-  // 向き決めフェーズ中、視野コーンを撮影地点・方向・画角に合わせて地図上に描画。
+  // 向き決め(②)・山選択(③)の俯瞰中、視野コーンを地図上に描画（写る方向の山を選びやすく）。
   useEffect(() => {
-    if (appMode === "ar" && arStep === "params" && arLoc) {
+    if (appMode === "ar" && (arStep === "params" || arStep === "select") && arLoc) {
       apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg);
     } else {
       apiRef.current?.hideViewCone();
@@ -1303,9 +1303,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     apiRef.current?.setControlMode("aim"); // ドラッグ＝方向。回転・パンは無効
     setArStep("params");
   };
-  // 向き・画角フェーズの「次へ」: 決めた向き・画角で一人称(微調整)へ。
+  // 向き・画角フェーズの「次へ」: 決めた向き・画角で山選択(③)へ。
   const confirmArParams = () => {
-    if (arLoc) goAlign(arLoc, arHeadingDeg ?? 0, arFovDeg);
+    goSelectFromParams();
   };
   // 向き・画角(②)→ 撮影地点(①)へ戻る（位置を選び直せる）。
   const backToLocate = () => {
@@ -1314,12 +1314,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     apiRef.current?.flyTo({ lat: arLoc.lat, lon: arLoc.lon }); // 撮影地点へ寄せる
     setArStep("locate");
   };
-  // 合わせる(③)→ 向き・画角(②)へ戻る。一人称での調整を②へ反映してから戻す。
+  // 山選択(③)→ 向き・画角(②)へ戻る。俯瞰のまま向き決め(コーン)へ。
   const backToParams = () => {
     if (!arLoc) return;
-    setArHeadingDeg(camHeading); // 微調整した向き・画角を②に引き継ぐ
-    setArFovDeg(camFov);
-    exitCameraMode(); // 一人称→地図
     apiRef.current?.frameAimView(arLoc.lon, arLoc.lat);
     apiRef.current?.setControlMode("aim");
     setArStep("params");
@@ -1337,39 +1334,32 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArCompositeUrl(null);
     setArStep("upload");
   };
-  // 合わせる(一人称)→山選択(3D俯瞰地図)。奥行きが見えてどの山が手前/奥か分かりやすい。
-  // 地図モード中は camHeading/Pitch/Fov が変わらないので、合わせたポーズは状態に保たれる。
-  const goSelect = () => {
-    exitCameraMode(); // 一人称→地図モードへ（パンは一旦解除される）
-    if (arLoc) {
-      apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading); // 撮影地点中心の俯瞰へ
-      apiRef.current?.setControlMode("orbit"); // 場所は固定。回転・ズームのみ
-    }
+  // 向き・画角(②)→ 山選択(③)。撮影地点中心の俯瞰で、写る方向の山を奥行きつきで選ぶ。
+  const goSelectFromParams = () => {
+    if (!arLoc) return;
+    apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0);
+    apiRef.current?.setControlMode("orbit"); // 場所は固定。回転・ズームのみ
     setArStep("select");
   };
-  // 合わせたポーズ(状態に保持)で一人称へ復帰。
-  const restoreAlignedCamera = () => {
-    if (!arLoc) return;
-    enterCameraMode({
-      lon: arLoc.lon,
-      lat: arLoc.lat,
-      headingDeg: camHeading,
-      pitchDeg: camPitch,
-      fovDeg: camFov,
-    });
+  // 山選択(③)→ 微調整(④)。一人称へ。選んだ山名が写真に重なるので、見ながら合わせ込める。
+  const goAlignFromSelect = () => {
+    if (arLoc) goAlign(arLoc, arHeadingDeg ?? 0, arFovDeg);
   };
-  // 山選択→合わせるへ戻る（一人称ポーズに復帰）。
-  const backToAlign = () => {
-    restoreAlignedCamera();
-    setArStep("align");
+  // 微調整(④)→ 山選択(③)へ戻る。微調整した向き・画角を引き継いでから俯瞰へ。
+  const backToSelect = () => {
+    if (!arLoc) return;
+    setArHeadingDeg(camHeading); // 微調整を反映
+    setArFovDeg(camFov);
+    exitCameraMode(); // 一人称→地図
+    apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
+    apiRef.current?.setControlMode("orbit");
+    setArStep("select");
   };
   // 選択した山頂を写真の上に「山名＋標高」で焼き込み、合成画像(JPEG)を作る。
   const generateComposite = async () => {
     const mount = mountRef.current;
     if (!photoUrl || !mount) return;
-    // 一人称へ復帰した直後はカメラ行列が次フレームで反映されるため、2フレーム待ってから投影。
-    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-    const sel = apiRef.current?.getPeakSelection() ?? []; // 合わせたポーズでの投影座標
+    const sel = apiRef.current?.getPeakSelection() ?? []; // 微調整した一人称ポーズでの投影座標
     const img = new Image();
     img.src = photoUrl;
     await img.decode();
@@ -1424,21 +1414,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     }
     setArCompositeUrl(canvas.toDataURL("image/jpeg", 0.92));
   };
-  // 山選択→書き出しへ。一人称(合わせたポーズ)へ復帰してから写真へ投影・合成。
+  // 微調整(④)→ 書き出し(⑤)。今の一人称ポーズのまま投影・合成（復帰不要）。
   const goExport = () => {
-    restoreAlignedCamera(); // 俯瞰地図→写真に合わせた一人称へ戻す
     setArStep("export");
     void generateComposite();
   };
-  // 書き出し→山選択(俯瞰地図)へ戻る（合成をやり直せるように）。
-  const backToSelectFromExport = () => {
+  // 書き出し(⑤)→ 微調整(④)へ戻る。一人称のまま合成パネルを閉じる。
+  const backToAlignFromExport = () => {
     setArCompositeUrl(null);
-    exitCameraMode();
-    if (arLoc) {
-      apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
-      apiRef.current?.setControlMode("orbit");
-    }
-    setArStep("select");
+    setArStep("align");
   };
   // 書き出した合成画像をダウンロード。
   const downloadComposite = () => {
@@ -1563,15 +1547,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
-      {/* AR進行表示（地点 → 画角 → 向き → 山 → 出力） */}
+      {/* AR進行表示（地点 → 向き画角 → 山選択 → 微調整 → 出力） */}
       {appMode === "ar" && arStep !== "upload" && (
         <div className="ar-steps">
-          {(["locate", "params", "align", "select", "export"] as const).map((k, idx) => {
+          {(["locate", "params", "select", "align", "export"] as const).map((k, idx) => {
             const order: Record<string, number> = {
               locate: 0,
               params: 1,
-              align: 2,
-              select: 3,
+              select: 2,
+              align: 3,
               export: 4,
             };
             const cur = order[arStep];
@@ -1625,12 +1609,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             <img className="ar-select-thumb" src={photoUrl} alt="撮影写真" title="撮影した写真" />
           )}
           <div className="ar-bottom-bar">
-            <button className="ar-btn-sub" onClick={backToAlign}>
-              ← 向き調整
+            <button className="ar-btn-sub" onClick={backToParams}>
+              ← 向き・画角
             </button>
             <span className="ar-select-count">選択 {peakSelCount} 山</span>
-            <button className="ar-btn-main" disabled={peakSelCount === 0} onClick={goExport}>
-              書き出し →
+            <button className="ar-btn-main" onClick={goAlignFromSelect}>
+              微調整へ →
             </button>
           </div>
         </>
@@ -1663,7 +1647,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 ← 撮影地点
               </button>
               <button className="ar-btn-main" onClick={confirmArParams}>
-                写真に合わせる →
+                山を選ぶ →
               </button>
             </div>
           </div>
@@ -1680,8 +1664,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             <p className="ar-export-loading">生成中…</p>
           )}
           <div className="ar-export-actions">
-            <button className="ar-btn-sub" onClick={backToSelectFromExport}>
-              ← 山選択へ
+            <button className="ar-btn-sub" onClick={backToAlignFromExport}>
+              ← 微調整へ
             </button>
             <button className="ar-btn-main" disabled={!arCompositeUrl} onClick={downloadComposite}>
               ダウンロード
@@ -1795,18 +1779,18 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "simulation" && (
             <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
           )}
-          {/* AR ③微調整: 説明＋戻る/山選択へ */}
+          {/* AR ④微調整: 選んだ山名を写真に重ねて見ながら合わせ込む */}
           {appMode === "ar" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                写真にぴったり合うよう微調整。ドラッグで向き（上下左右）、ピンチ/ホイールで画角。
+                選んだ山名が写真に重なります。ドラッグで向き・ピンチ/ホイールで画角を合わせ込む。
               </span>
               <div className="ar-phase-foot-row">
-                <button className="ar-btn-sub" onClick={backToParams}>
-                  ← 向き・画角
+                <button className="ar-btn-sub" onClick={backToSelect}>
+                  ← 山選択
                 </button>
-                <button className="ar-btn-main" onClick={goSelect}>
-                  山を選ぶ →
+                <button className="ar-btn-main" onClick={goExport}>
+                  書き出し →
                 </button>
               </div>
             </div>
