@@ -190,6 +190,67 @@ body,
   text-align: center;
 }
 
+/* --- 写真オーバーレイ（カメラ視点に撮影画像を重ねて位置合わせ） --- */
+.photo-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* 画像のアスペクト比を保って画面に収める */
+  pointer-events: none; /* 下のキャンバスでドラッグ・ピンチ操作を続けられる */
+  z-index: 4; /* キャンバス(0)より上、山名ラベル(6)・HUD(20)より下 */
+}
+.cam-photo {
+  display: flex;
+  justify-content: center;
+}
+.cam-photo-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #e6edf5;
+  background: rgba(79, 134, 198, 0.22);
+  border: 1px solid rgba(130, 150, 175, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cam-photo-pick:hover {
+  background: rgba(79, 134, 198, 0.34);
+}
+.cam-photo-ctrl {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+.cam-photo-opacity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 12px;
+  color: #cdd6e2;
+}
+.cam-photo-opacity input[type="range"] {
+  width: 100%;
+  accent-color: #4f86c6;
+}
+.cam-photo-clear {
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #e6edf5;
+  background: rgba(40, 48, 60, 0.7);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cam-photo-clear:hover {
+  background: rgba(60, 70, 86, 0.8);
+}
+
 /* --- メニュー開閉ボタン（左上） --- */
 .menu-toggle {
   position: absolute;

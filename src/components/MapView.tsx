@@ -21,6 +21,7 @@ import {
   IconMap,
   IconSun,
   IconMoonPhase,
+  IconImage,
 } from "./icons";
 import {
   worldToLonLat,
@@ -166,6 +167,10 @@ export default function MapView() {
   const [camPitch, setCamPitch] = useState(0);
   const [camFov, setCamFov] = useState(CAM_FOV_DEFAULT);
   const [camEyeHeight, setCamEyeHeight] = useState(CAM_EYE_DEFAULT);
+  // 写真オーバーレイ（カメラ視点に撮影画像を重ね、手動で位置合わせ）。M1=重ね描画のみ。
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoOpacity, setPhotoOpacity] = useState(0.5);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
   const [openSec, setOpenSec] = useState<Record<string, boolean>>({
     search: true,
@@ -786,6 +791,13 @@ export default function MapView() {
     showSkyRef.current = showSky;
   }, [showSky]);
 
+  // 写真オーバーレイの blob URL をアンマウント時に解放（メモリリーク防止）。
+  useEffect(() => {
+    return () => {
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+    };
+  }, [photoUrl]);
+
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -949,6 +961,18 @@ export default function MapView() {
     apiRef.current?.setVerticalExaggeration(mapVex); // 地図用VEXへ戻す（地形再生成）
     setMode("map");
   };
+  // 写真オーバーレイ: 撮影画像を取り込んで blob URL にする（前の画像は破棄）。
+  const onPickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    setPhotoUrl(URL.createObjectURL(file));
+    e.target.value = ""; // 同じファイルを連続で選べるようリセット
+  };
+  const clearPhoto = () => {
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    setPhotoUrl(null);
+  };
   // 現在モードの標高誇張を変更（モードごとに記憶）。
   const activeVex = mode === "camera" ? camVex : mapVex;
   const changeVex = (v: number) => {
@@ -1037,6 +1061,11 @@ export default function MapView() {
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
 
+      {/* 写真オーバーレイ（カメラ視点でのみ。キャンバスの上・山名ラベルの下に重ねる） */}
+      {mode === "camera" && photoUrl && (
+        <img className="photo-overlay" src={photoUrl} alt="" style={{ opacity: photoOpacity }} />
+      )}
+
       {/* 中心レティクル（注視点＝画面中央の目印） */}
       {mode === "map" && showCenter && (
         <svg ref={reticleRef} className="center-reticle" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
@@ -1103,6 +1132,38 @@ export default function MapView() {
               onChange={(e) => changeCamEyeHeight(Number(e.target.value))}
             />
           </label>
+          {/* 写真オーバーレイ: 未読込なら取り込みボタン、読込済みなら不透明度＋解除 */}
+          <div className="cam-photo">
+            {!photoUrl ? (
+              <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
+                <IconImage size={15} />
+                <span>写真を重ねて合わせる</span>
+              </button>
+            ) : (
+              <div className="cam-photo-ctrl">
+                <label className="cam-photo-opacity">
+                  <span>写真の不透明度 {Math.round(photoOpacity * 100)}%</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(photoOpacity * 100)}
+                    onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
+                  />
+                </label>
+                <button className="cam-photo-clear" title="写真を外す" onClick={clearPhoto}>
+                  写真を外す
+                </button>
+              </div>
+            )}
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={onPickPhoto}
+          />
           <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
         </div>
       )}
