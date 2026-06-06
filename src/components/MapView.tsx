@@ -77,6 +77,7 @@ const CAM_PITCH_LIMIT = 80;
 const CAM_EYE_DEFAULT = 1.6; // 目線高さ(m, 地表から)
 const VEX_MAP_DEFAULT = 1.7; // 地図モードの標高誇張
 const VEX_CAM_DEFAULT = 1.0; // カメラ視点モードの標高誇張（実寸）
+const CAM_CELESTIAL_R = 5000; // カメラ視点で太陽月を置く半径(ワールド≒遠方の空)
 
 // 方位az(0=北,90=東)・仰角alt(0=水平) → 単位方向(X=東,Y=上,Z=南で北=-Z)。
 function dirAzAlt(azDeg: number, altDeg: number, out: THREE.Vector3): THREE.Vector3 {
@@ -332,8 +333,7 @@ export default function MapView() {
         cam.heading = ((Math.atan2(dirTmp.x, -dirTmp.z) * 180) / Math.PI + 360) % 360;
         cam.pitch = 0;
         cam.fov = CAM_FOV_DEFAULT;
-        terrain.setClip(null, 0); // 円盤クリップ解除
-        celestial.setVisible(false);
+        terrain.setClip(null, 0); // 円盤クリップ解除（カメラ視点は切り抜かない）
         cameraMode = true;
         controls.enabled = false;
         return { heading: cam.heading, pitch: cam.pitch, fov: cam.fov };
@@ -486,6 +486,12 @@ export default function MapView() {
           camera.updateProjectionMatrix();
         }
         if (reticleRef.current) reticleRef.current.style.display = "none";
+        // 太陽・月：カメラ視点では切り抜かず、視点(目)を中心に遠方の空へ配置。
+        if (celestialActive) {
+          celestial.setHorizonVisible(false);
+          celestialCenter.set(cam.eyeX, eyeY, cam.eyeZ);
+          celestial.place(celestialCenter, CAM_CELESTIAL_R);
+        }
         terrain.update(camera, mount.clientHeight, 30);
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
@@ -500,6 +506,7 @@ export default function MapView() {
         // 円盤クリップは terrain.update より前に設定（refine が当該フレームの半径を使う）。
         if (celestialActive) {
           // 中心＝視点中心。半径＝カメラ距離連動。パン・ズームに円盤と太陽月が追従。
+          celestial.setHorizonVisible(true);
           const tx = controls.target.x;
           const tz = controls.target.z;
           celestialCenter.set(tx, controls.target.y, tz);
@@ -712,9 +719,8 @@ export default function MapView() {
     apiRef.current?.setFreeLook(nv);
   };
 
-  // カメラ視点モードへ（太陽月・自由視点はマップ専用なのでオフにしてから入る）。
+  // カメラ視点モードへ（太陽月は維持。自由視点はマップ専用なのでオフにしてから入る）。
   const enterCameraMode = () => {
-    if (celestialOn) setCelestialOn(false);
     if (freeLook) {
       setFreeLook(false);
       apiRef.current?.setFreeLook(false);
