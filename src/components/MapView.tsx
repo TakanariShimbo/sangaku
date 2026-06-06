@@ -1698,7 +1698,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             return (
               <span key={k} className={`ar-step is-${cls}`}>
                 <b>{idx + 1}</b>
-                {label}
+                <span className="ar-step-label">{label}</span>
               </span>
             );
           })}
