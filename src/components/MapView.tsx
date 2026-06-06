@@ -74,10 +74,16 @@ const RADIUS_MIN = 1;
 const RADIUS_MAX = 50;
 const RADIUS_DEFAULT = 8;
 
-// カメラ視点の既定値。
-const CAM_FOV_DEFAULT = 55;
-const CAM_FOV_MIN = 20;
-const CAM_FOV_MAX = 90;
+// 地図モードの縦画角（Three.js の PerspectiveCamera.fov は縦画角）。
+const MAP_FOV = 55;
+// カメラ視点の既定値。CAM_FOV_* は「横画角」(deg)。毎フレーム現在のアスペクト比から
+// 縦画角に換算して camera.fov へ入れる（ディスプレイ比が変わっても横の写りが一定）。
+const CAM_FOV_DEFAULT = 75; // 横画角の既定（一般的なスマホカメラ相当）
+// 横画角の下限は小さめに。縦持ち(縦長アスペクト)だと横固定により縦画角が広がるが、
+// 横を絞れば縦も比例して下がるので、下限を低くしておけばユーザー側で回避できる
+// （遠くの山を覗き込む望遠ズームとしても有用）。
+const CAM_FOV_MIN = 15;
+const CAM_FOV_MAX = 110;
 const CAM_PITCH_LIMIT = 80;
 const CAM_EYE_DEFAULT = 1.6; // 目線高さ(m, 地表から)
 const VEX_MAP_DEFAULT = 1.7; // 地図モードの標高誇張
@@ -223,7 +229,7 @@ export default function MapView() {
     scene.fog = new THREE.Fog(0x0a0d12, 2000, 7000);
 
     const camera = new THREE.PerspectiveCamera(
-      55,
+      MAP_FOV,
       mount.clientWidth / mount.clientHeight,
       0.05,
       9000,
@@ -430,7 +436,7 @@ export default function MapView() {
           controls.target.copy(mapPose.target);
           mapPose = null;
         }
-        camera.fov = CAM_FOV_DEFAULT;
+        camera.fov = MAP_FOV; // 地図モードは縦画角 MAP_FOV に戻す
         camera.updateProjectionMatrix();
         controls.update();
       },
@@ -490,8 +496,8 @@ export default function MapView() {
         }
         pinchDist = d;
       } else {
-        // 1本指＝向き（ズーム(小fov)ほど感度を下げる）。
-        const degPerPx = cam.fov / mount.clientHeight;
+        // 1本指＝向き（ズーム(小fov)ほど感度を下げる）。実際の縦画角(camera.fov)基準。
+        const degPerPx = camera.fov / mount.clientHeight;
         cam.heading = (cam.heading - dx * degPerPx + 360) % 360;
         cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * degPerPx, -CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
         setCamHeading(cam.heading);
@@ -622,8 +628,14 @@ export default function MapView() {
         camera.position.set(cam.eyeX, eyeY, cam.eyeZ);
         dirAzAlt(cam.heading, cam.pitch, dirTmp);
         camera.lookAt(cam.eyeX + dirTmp.x, eyeY + dirTmp.y, cam.eyeZ + dirTmp.z);
-        if (camera.fov !== cam.fov) {
-          camera.fov = cam.fov;
+        // cam.fov は「横画角」。現在のアスペクト比から縦画角に換算して PerspectiveCamera へ。
+        // ディスプレイ比が変わっても横の写りが一定（縦がアスペクトに追従）。
+        const aspect = mount.clientWidth / Math.max(1, mount.clientHeight);
+        const vFov = THREE.MathUtils.radToDeg(
+          2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / aspect),
+        );
+        if (Math.abs(camera.fov - vFov) > 1e-3) {
+          camera.fov = vFov;
           camera.updateProjectionMatrix();
         }
         if (reticleRef.current) reticleRef.current.style.display = "none";
@@ -1060,7 +1072,7 @@ export default function MapView() {
           <div className="cam-readout">
             <span>方位 {compass(camHeading)} {Math.round(camHeading)}°</span>
             <span>仰角 {Math.round(camPitch)}°</span>
-            <span>画角 {Math.round(camFov)}°</span>
+            <span>横画角 {Math.round(camFov)}°</span>
           </div>
           <label className="cam-eye">
             <span>目線高さ {camEyeHeight} m</span>
