@@ -2352,14 +2352,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
             </div>
           )}
-          {/* 自由視点（リモコンの下） */}
-          <button
-            className={`freelook-toggle${freeLook ? " is-active" : ""}`}
-            title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
-            onClick={toggleFreeLook}
-          >
-            {freeLook ? "自由視点：ON" : "自由視点"}
-          </button>
+          {/* 自由視点（リモコンの下）。ARでは機能しないので出さない。 */}
+          {appMode === "simulation" && (
+            <button
+              className={`freelook-toggle${freeLook ? " is-active" : ""}`}
+              title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
+              onClick={toggleFreeLook}
+            >
+              {freeLook ? "自由視点：ON" : "自由視点"}
+            </button>
+          )}
         </div>
       )}
 
