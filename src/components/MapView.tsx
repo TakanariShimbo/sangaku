@@ -514,10 +514,13 @@ export default function MapView() {
         return;
       }
 
-      skyDome.setVisible(false); // 地図モードは暗背景のまま
       applyNav();
       controls.update();
       const camDist = camera.position.distanceTo(controls.target);
+      // 空グラデーション（地図モードでも傾ければ見える。常時表示）。
+      skyDome.setVisible(true);
+      skyDome.setSunDir(sunDirWorld);
+      skyDome.place(camera.position);
       // 視点フリー中は、地形LOD・円盤・太陽月の連動を凍結（カメラだけ動かす）。
       if (!freeLookActive) {
         // 円盤クリップは terrain.update より前に設定（refine が当該フレームの半径を使う）。
@@ -634,11 +637,11 @@ export default function MapView() {
     api.setCelestialActive(true);
   }, [celestialOn, sunObserver, skyDate, skyInfo]);
 
-  // カメラ視点で太陽月OFFのときは、空の太陽方向を「現在時刻」で計算してセット。
+  // 太陽月OFFのときは、空の太陽方向を「現在時刻」で計算してセット（地図・カメラ共通）。
   // （太陽月ON のときは setCelestialSky が選択時刻で更新するのでここは何もしない）
   useEffect(() => {
     const api = apiRef.current;
-    if (!api || mode !== "camera" || celestialOn) return;
+    if (!api || celestialOn) return;
     const center = api.getCenter();
     if (!center) return;
     const sky = computeSky(new Date(), center.lat, center.lon);
