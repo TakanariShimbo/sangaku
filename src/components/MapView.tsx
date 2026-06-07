@@ -143,11 +143,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setPeaksData: (data: Awaited<ReturnType<typeof loadAllMountains>>) => void;
     clearPeakSelection: () => void;
     getPeakSelection: () => { name: string; elevM: number; u: number; v: number }[]; // 書き出し用: 選択山の写真内正規化座標
-    frameSelectView: (lon: number, lat: number, headingDeg: number) => void; // AR山選択: 撮影地点後方上空の俯瞰へ
-    frameAimView: (lon: number, lat: number) => void; // AR向き決め: 撮影地点中心の北上俯瞰へ
     setControlMode: (mode: "map" | "aim" | "orbit") => void; // 地図操作: 通常 / 向き決め / 回転のみ
-    setMapDimension: (dim: "2d" | "3d") => void; // 地図(俯瞰)の2D(真上固定)/3D(傾け可)切替
-    setViewCone: (lon: number, lat: number, headingDeg: number, fovDeg: number) => void; // 視野コーン表示
+    // 地図(俯瞰)の2D(真上固定)/3D(傾け可)切替。center指定で撮影地点中心に寄せ、3Dはheading背後上空から見下ろす。
+    setMapDimension: (dim: "2d" | "3d", center?: { lon: number; lat: number }, headingDeg?: number) => void;
+    setViewCone: (lon: number, lat: number, headingDeg: number, fovDeg: number, flat: boolean) => void; // 視野コーン（flat=2D）
     hideViewCone: () => void;
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
@@ -166,8 +165,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // サイドバー開閉。
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // 地図(俯瞰)の2D/3D。2D=真上固定の地図、3D=傾けられる地形。カメラ視点には影響しない。
-  const [map2D, setMap2D] = useState(false);
-  const map2DRef = useRef(false);
+  // AR/ライブは向き決め・山選択を真上から行いたいので既定2D。シミュレーションは3D。
+  const [map2D, setMap2D] = useState(appMode !== "simulation");
+  const map2DRef = useRef(appMode !== "simulation");
   // 中心マーカー（視点中心＝画面中央の目印）。画面中央のレティクルで表示する。
   const [showCenter, setShowCenter] = useState(true);
   // 空グラデーション表示。
@@ -205,6 +205,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 出力(仕上げ)で編集する各山ラベル。座標は写真フレーム内の正規化値(0..1)。
   const [arLabels, setArLabels] = useState<ArLabel[]>([]);
   const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
+  const arLocRef = useRef<{ lat: number; lon: number } | null>(null); // 撮影地点（2D/3D切替の中心に使う）
+  const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
   const arPinXZRef = useRef<{ x: number; z: number } | null>(null); // 撮影地点ピンのワールドXZ
   const arPinElRef = useRef<HTMLDivElement | null>(null); // 撮影地点ピンのDOM（先端を地表に接地）
   const arPhotoAspectRef = useRef<number | null>(null); // 撮影写真の縦横比(W/H)。3D枠の整形に使う
@@ -575,9 +577,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewConeCenter.visible = false;
     scene.add(viewConeCenter);
     // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
-    const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
-      const lowY = elevToWorldY(VC_BOT_M);
+    const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number, flat: boolean) => {
       const highY = elevToWorldY(VC_TOP_M);
+      // 2D(flat)では上面に潰す＝垂直の壁が消え、上面の扇＋線だけになる。3Dでは下端まで立体。
+      const lowY = flat ? highY : elevToWorldY(VC_BOT_M);
       const half = (Math.min(Math.max(fovDeg, 1), 175) / 2) * (Math.PI / 180);
       const h0 = (headingDeg * Math.PI) / 180;
       // 長さはズーム連動だが、方向が分かるよう遠くまで伸ばす（塗りは途中で透過するので長くてOK）。
@@ -623,7 +626,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       viewConeCenterGeom.computeBoundingSphere();
       viewCone.visible = true;
       viewConePlanes.visible = true;
-      viewConeCenter.visible = true;
+      viewConeCenter.visible = !flat; // 2Dでは中心の垂直面は出さない（上面の情報だけ）
     };
 
     const getCenter = (): LonLat | null => {
@@ -770,38 +773,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       clearPeakSelection: () => {
         peaks.clearSelection(); // ラベルの選択強調は次フレームの updatePeakLabels で反映
       },
-      // AR山選択: 撮影地点（＝注視点）を中心に、その後ろ上空から heading 方向を見下ろす俯瞰へ。
-      // 引きすぎず撮影地点が分かる距離。パンは別途ロックして場所が動かないようにする。
-      frameSelectView: (lon, lat, headingDeg) => {
-        const ex = mercXToWorld(lonToMercX(lon));
-        const ez = mercYToWorld(latToMercY(lat));
-        const h = sampleSurfaceY(ex, ez);
-        const hr = (headingDeg * Math.PI) / 180;
-        const fx = Math.sin(hr); // 前方(heading)の水平成分（X=東, Z=南, 北=-Z）
-        const fz = -Math.cos(hr);
-        const BACK = 42; // 撮影地点の後ろへ引く距離(world)。引きすぎない
-        const UP = 34; // 上空へ上げる高さ(world)
-        controls.target.set(ex, h, ez); // 注視点＝撮影地点そのもの
-        camera.position.set(ex - fx * BACK, h + UP, ez - fz * BACK);
-        camera.up.set(0, 1, 0);
-        flyGoal = null; // 進行中の fly を止める
-        controls.update();
-      },
-      // 撮影地点の「ほぼ真上」へ（少し南に倒して北を上に）。今のズーム距離は保ったまま
-      // flyGoal でフライトのように滑らかに移動。真上にすると向き（コンパス）が読みやすい。
-      frameAimView: (lon, lat) => {
-        const ex = mercXToWorld(lonToMercX(lon));
-        const ez = mercYToWorld(latToMercY(lat));
-        const h = sampleSurfaceY(ex, ez);
-        // 現在のズームを維持しつつ、極端に引きすぎ/寄りすぎは適度に収める。
-        const dist = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target), 12, 160);
-        const polar = 0; // 真上（扇が立体に見えない）。OrbitControlsのmakeSafeが特異点を微小回避し北上で安定
-        camera.up.set(0, 1, 0);
-        flyGoal = {
-          pos: new THREE.Vector3(ex, h + dist * Math.cos(polar), ez + dist * Math.sin(polar)),
-          target: new THREE.Vector3(ex, h, ez),
-        };
-      },
       // 地図操作モード: map=通常 / aim=向き決め(ドラッグで方向、回転パン無効) / orbit=山選択(回転のみ)。
       setControlMode: (mode) => {
         controls.enableZoom = true;
@@ -814,29 +785,50 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       },
       // 地図(俯瞰)の2D/3D切替。フライト（滑らかな傾き移動）で行う。
       // 2D=真上固定で傾け不可、3D=俯瞰角へ傾けて自由回転。
-      setMapDimension: (dim) => {
+      // center を渡すと撮影地点中心に寄せ直す（フェーズ間の専用フライトは廃し、2D/3D切替がフライトを兼ねる）。
+      // 3Dは headingDeg の背後上空から見下ろす（撮影者の背中側＝写る方向が奥）。
+      setMapDimension: (dim, center, headingDeg) => {
         map2DRef.current = dim === "2d";
         camera.up.set(0, 1, 0);
-        const t = controls.target;
-        const dist = camera.position.distanceTo(t);
+        // 中心: center指定があれば撮影地点、なければ現在の注視点を維持。
+        let cx = controls.target.x;
+        let cy = controls.target.y;
+        let cz = controls.target.z;
+        if (center) {
+          cx = mercXToWorld(lonToMercX(center.lon));
+          cz = mercYToWorld(latToMercY(center.lat));
+          cy = sampleSurfaceY(cx, cz);
+        }
+        const target = new THREE.Vector3(cx, cy, cz);
+        // 現在のズームを維持。撮影地点に寄せ直す時だけ極端な引き/寄りを適度に収める。
+        let dist = camera.position.distanceTo(controls.target);
+        if (center) dist = THREE.MathUtils.clamp(dist, 12, 160);
         // 飛行中はクランプを外す（外さないとスナップして飛行にならない）。
         controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
         if (dim === "2d") {
           controls.enableRotate = false;
           pending2DLock = true; // 飛行完了後に真上固定を掛ける
-          flyGoal = { pos: new THREE.Vector3(t.x, t.y + dist, t.z), target: t.clone() };
+          flyGoal = { pos: new THREE.Vector3(cx, cy + dist, cz), target };
         } else {
           controls.enableRotate = true;
           pending2DLock = false;
           const polar = THREE.MathUtils.degToRad(55); // 俯瞰角
-          flyGoal = {
-            pos: new THREE.Vector3(t.x, t.y + dist * Math.cos(polar), t.z + dist * Math.sin(polar)),
-            target: t.clone(),
-          };
+          const horiz = dist * Math.sin(polar);
+          if (typeof headingDeg === "number") {
+            const hr = (headingDeg * Math.PI) / 180;
+            const fx = Math.sin(hr); // 前方(heading)の水平成分（X=東, Z=南, 北=-Z）
+            const fz = -Math.cos(hr);
+            flyGoal = {
+              pos: new THREE.Vector3(cx - fx * horiz, cy + dist * Math.cos(polar), cz - fz * horiz),
+              target,
+            };
+          } else {
+            flyGoal = { pos: new THREE.Vector3(cx, cy + dist * Math.cos(polar), cz + horiz), target };
+          }
         }
       },
-      setViewCone: (lon, lat, headingDeg, fovDeg) => {
-        updateViewCone(mercXToWorld(lonToMercX(lon)), mercYToWorld(latToMercY(lat)), headingDeg, fovDeg);
+      setViewCone: (lon, lat, headingDeg, fovDeg, flat) => {
+        updateViewCone(mercXToWorld(lonToMercX(lon)), mercYToWorld(latToMercY(lat)), headingDeg, fovDeg, flat);
       },
       hideViewCone: () => {
         viewCone.visible = false;
@@ -1261,10 +1253,24 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArPanelOpen(true);
     setArDockOffset({ x: 0, y: 0 });
   }, [arStep]);
-  // 地図の2D/3D切替を反映（カメラ視点中は地図に戻った時に効く）。
+  // arLoc/方位を ref に同期（2D/3D切替の中心・背後角に使う。toggle effectを方位変化で再発火させない）。
+  useEffect(() => {
+    arLocRef.current = arLoc;
+  }, [arLoc]);
+  useEffect(() => {
+    arHeadingRef.current = arHeadingDeg;
+  }, [arHeadingDeg]);
+  // 地図の2D/3D切替を反映。AR/ライブの向き決め(②)・山選択(③)では撮影地点中心に寄せ直す
+  // （フェーズ間の専用フライトは廃し、この切替フライトが兼ねる）。それ以外は今の中心のまま傾けを変える。
   useEffect(() => {
     map2DRef.current = map2D;
-    apiRef.current?.setMapDimension(map2D ? "2d" : "3d");
+    const dim = map2D ? "2d" : "3d";
+    const st = arStepRef.current;
+    if (arLocRef.current && (st === "params" || st === "select")) {
+      apiRef.current?.setMapDimension(dim, arLocRef.current, arHeadingRef.current ?? 0);
+    } else {
+      apiRef.current?.setMapDimension(dim);
+    }
   }, [map2D]);
   useEffect(() => {
     appModeRef.current = appMode;
@@ -1288,11 +1294,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 向き決め(②)・山選択(③)の俯瞰中、視野コーンを地図上に描画（写る方向の山を選びやすく）。
   useEffect(() => {
     if (arLike && (arStep === "params" || arStep === "select") && arLoc) {
-      apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg);
+      apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg, map2D);
     } else {
       apiRef.current?.hideViewCone();
     }
-  }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg]);
+  }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg, map2D]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
   // ライブARは別途 startLiveLocate で現在地→撮影地点に置くのでここはスキップ。
@@ -1575,6 +1581,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     }
     setArStep("locate"); // 位置の確認/指定フェーズへ（EXIFありは確認、なしは指定）
   };
+  // AR/ライブ②③: 現在の2D/3D状態のまま、撮影地点中心に地図を寄せ直す。
+  // フェーズ間の専用フライト（真上↔背後）は廃止し、2D/3D切替フライトと同じ枠組みに統一。
+  // 2D=真上、3D=heading の背後上空から見下ろす。
+  const frameArMapView = (headingDeg: number) => {
+    if (!arLoc) return;
+    apiRef.current?.setMapDimension(map2D ? "2d" : "3d", { lon: arLoc.lon, lat: arLoc.lat }, headingDeg);
+  };
   // 撮影地点フェーズの「ここで決定」: 向きと画角をざっくり決めるフェーズへ（常に）。
   const confirmArLocate = () => {
     if (!arLoc) return;
@@ -1582,7 +1595,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       requestOrientationPermission(); // iOS等の方位センサ許可（ユーザー操作起点）
       setLiveFollow(true); // ②に入る時は方位センサ追従ONから（その後タップ/ボタンで固定）
     }
-    apiRef.current?.frameAimView(arLoc.lon, arLoc.lat); // 撮影地点中心の北上俯瞰へ
+    frameArMapView(arHeadingDeg ?? 0); // 現在の2D/3Dで撮影地点中心へ寄せる
     apiRef.current?.setControlMode("map"); // パン/回転/ズーム可。方向はタップで指定
     setArStep("params");
   };
@@ -1601,7 +1614,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const backToParams = () => {
     if (!arLoc) return;
     if (appMode === "live") setLiveFollow(true); // ②へ戻る時は追従ONから
-    apiRef.current?.frameAimView(arLoc.lon, arLoc.lat);
+    frameArMapView(arHeadingDeg ?? 0);
     apiRef.current?.setControlMode("map");
     setArStep("params");
   };
@@ -1622,14 +1635,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 撮影地点に戻る（自由に見て回った後、フェーズ1で決めた地点へ視点を戻す）。
   const recenterAr = () => {
     if (!arLoc) return;
-    if (arStep === "params") apiRef.current?.frameAimView(arLoc.lon, arLoc.lat);
-    else if (arStep === "select") apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0);
+    if (arStep === "params" || arStep === "select") frameArMapView(arHeadingDeg ?? 0);
     else apiRef.current?.flyTo({ lat: arLoc.lat, lon: arLoc.lon }); // locate
   };
   // 向き・画角(②)→ 山選択(③)。撮影地点中心の俯瞰で、写る方向の山を奥行きつきで選ぶ。
   const goSelectFromParams = () => {
     if (!arLoc) return;
-    apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0);
+    frameArMapView(arHeadingDeg ?? 0); // 2D同士なら見た目そのまま（②③間の専用フライトは無し）
     apiRef.current?.setControlMode("map"); // パン/回転/ズーム可（シミュレーションと同じ操作）
     setArStep("select");
   };
@@ -1644,7 +1656,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArFovDeg(camFov);
     if (appMode === "live") stopLiveCamera(); // ライブは一旦カメラ停止（再入で再開）
     exitCameraMode(); // 一人称→地図
-    apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
+    frameArMapView(camHeading); // 微調整した向きを背後角に反映して③へ
     apiRef.current?.setControlMode("map");
     setArStep("select");
   };
