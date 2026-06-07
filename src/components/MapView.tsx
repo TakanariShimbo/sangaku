@@ -1051,11 +1051,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         }
       }
 
-      // AR撮影地点ピン（撮影地点フェーズのみ）。タップ/検索で置いた地点を地表に追従表示。
+      // AR撮影地点ピン（地点/向き決め/山選択の各フェーズで表示）。置いた地点を地表に追従表示。
       const arPinEl = arPinElRef.current;
       if (arPinEl) {
         const pxz = arPinXZRef.current;
-        if (arStepRef.current === "locate" && pxz) {
+        const st = arStepRef.current;
+        if ((st === "locate" || st === "params" || st === "select") && pxz) {
           arPinWorld.set(pxz.x, sampleSurfaceY(pxz.x, pxz.z), pxz.z);
           projTmp.copy(arPinWorld).project(camera);
           if (projTmp.z <= 1) {
@@ -1707,6 +1708,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
+      {/* 撮影地点ピン（AR地図フェーズ：地点/向き決め/山選択で表示。位置はループが追従） */}
+      {appMode === "ar" && mode === "map" && (
+        <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
+          <IconPin size={30} />
+        </div>
+      )}
+
       {/* ② 撮影地点フェーズ: 案内＋ピン＋決定バー */}
       {appMode === "ar" && arStep === "locate" && (
         <>
@@ -1717,9 +1725,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
                 : "撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索"}
             </span>
-          </div>
-          <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
-            <IconPin size={30} />
           </div>
           <div className="ar-bottom-bar">
             <button className="ar-btn-sub" onClick={restartAr}>
