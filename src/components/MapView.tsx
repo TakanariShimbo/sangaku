@@ -441,21 +441,58 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     scene.add(previewRing);
 
     // --- AR向き決め: 撮影地点から「写る方向・範囲」を示す視野コーン（扇形）を地図上に描く --- //
-    const VIEWCONE_SEGS = 28;
-    const VIEWCONE_R = 90; // コーンの長さ(world)
+    // 視野コーンは「扇形を縦に押し出した3Dゾーン（プリズム）」。地形と交差させて浮かせない。
+    const VC_N = 28; // 弧の分割数
+    const VIEWCONE_R = 180; // コーンの長さ(world)の上限。線を遠くまで伸ばして方向を示す
+    const VC_TOP_M = 3900; // ゾーン上端の標高(m)。富士山(3776m)も収まる余裕
+    const VC_BOT_M = -300; // ゾーン下端の標高(m)。地面を貫通させて浮かないように
+    // 頂点: 下apex=0 / 下弧 i=1+i(i:0..N) / 上apex=N+2 / 上弧 i=N+3+i
+    const vcBotApex = 0;
+    const vcTopApex = VC_N + 2;
+    const vcBotArc = (i: number) => 1 + i;
+    const vcTopArc = (i: number) => VC_N + 3 + i;
+    const viewConePos = new Float32Array(2 * (VC_N + 2) * 3);
     const viewConeGeom = new THREE.BufferGeometry();
-    const viewConePos = new Float32Array((VIEWCONE_SEGS + 2) * 3); // 扇形(apex + 弧)を三角扇で
     viewConeGeom.setAttribute("position", new THREE.BufferAttribute(viewConePos, 3));
-    const viewConeIdx: number[] = [];
-    for (let i = 1; i <= VIEWCONE_SEGS; i++) viewConeIdx.push(0, i, i + 1);
-    viewConeGeom.setIndex(viewConeIdx);
+    // 頂点アルファで中心(濃い)→弧(透明)のグラデーション。弧より外は線だけ見える。
+    const VC_APEX_ALPHA = 0.34;
+    const viewConeCol = new Float32Array(2 * (VC_N + 2) * 4);
+    {
+      const cr = 0.37;
+      const cg = 0.63;
+      const cb = 0.9;
+      const setC = (vi: number, a: number) => {
+        const o = vi * 4;
+        viewConeCol[o] = cr;
+        viewConeCol[o + 1] = cg;
+        viewConeCol[o + 2] = cb;
+        viewConeCol[o + 3] = a;
+      };
+      setC(vcBotApex, VC_APEX_ALPHA);
+      setC(vcTopApex, VC_APEX_ALPHA);
+      for (let i = 0; i <= VC_N; i++) {
+        setC(vcBotArc(i), 0); // 弧（遠端）は透明
+        setC(vcTopArc(i), 0);
+      }
+    }
+    viewConeGeom.setAttribute("color", new THREE.BufferAttribute(viewConeCol, 4));
+    const triIdx: number[] = [];
+    for (let i = 0; i < VC_N; i++) {
+      triIdx.push(vcBotApex, vcBotArc(i), vcBotArc(i + 1)); // 底面
+      triIdx.push(vcTopApex, vcTopArc(i + 1), vcTopArc(i)); // 天面
+      triIdx.push(vcBotArc(i), vcBotArc(i + 1), vcTopArc(i + 1)); // 外周壁
+      triIdx.push(vcBotArc(i), vcTopArc(i + 1), vcTopArc(i));
+    }
+    triIdx.push(vcBotApex, vcBotArc(0), vcTopArc(0), vcBotApex, vcTopArc(0), vcTopApex); // 左壁
+    triIdx.push(vcBotApex, vcTopArc(VC_N), vcBotArc(VC_N), vcBotApex, vcTopApex, vcTopArc(VC_N)); // 右壁
+    viewConeGeom.setIndex(triIdx);
     const viewCone = new THREE.Mesh(
       viewConeGeom,
       new THREE.MeshBasicMaterial({
-        color: 0x5fa0e6,
+        vertexColors: true, // 中心→外へグラデーション（頂点アルファ）
         transparent: true,
-        opacity: 0.32,
-        depthTest: false,
+        depthTest: true, // 地形に正しく隠れる（地中は見えず、山は中に収まる）
+        depthWrite: false,
         side: THREE.DoubleSide,
       }),
     );
@@ -463,55 +500,49 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewCone.frustumCulled = false;
     viewCone.visible = false;
     scene.add(viewCone);
-    // コーンの縁（中心線＋外周）を線で強調。
+    // 縁（上下の弧＋角の縦エッジ）。位置はメッシュと共有し、線分で描く。
     const viewConeEdgeGeom = new THREE.BufferGeometry();
-    const viewConeEdgePos = new Float32Array((VIEWCONE_SEGS + 3) * 3);
-    viewConeEdgeGeom.setAttribute("position", new THREE.BufferAttribute(viewConeEdgePos, 3));
-    const viewConeEdge = new THREE.Line(
+    viewConeEdgeGeom.setAttribute("position", viewConeGeom.getAttribute("position"));
+    const edgeIdx: number[] = [];
+    for (let i = 0; i < VC_N; i++) edgeIdx.push(vcTopArc(i), vcTopArc(i + 1)); // 天の弧
+    for (let i = 0; i < VC_N; i++) edgeIdx.push(vcBotArc(i), vcBotArc(i + 1)); // 底の弧
+    edgeIdx.push(vcTopApex, vcTopArc(0), vcTopApex, vcTopArc(VC_N)); // 天の側辺
+    edgeIdx.push(vcBotApex, vcBotArc(0), vcBotApex, vcBotArc(VC_N)); // 底の側辺
+    edgeIdx.push(vcBotApex, vcTopApex, vcBotArc(0), vcTopArc(0), vcBotArc(VC_N), vcTopArc(VC_N)); // 縦
+    viewConeEdgeGeom.setIndex(edgeIdx);
+    const viewConeEdge = new THREE.LineSegments(
       viewConeEdgeGeom,
-      new THREE.LineBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.95, depthTest: false }),
+      new THREE.LineBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.8, depthTest: false }),
     );
     viewConeEdge.renderOrder = 999;
     viewConeEdge.frustumCulled = false;
     viewConeEdge.visible = false;
     scene.add(viewConeEdge);
-    // 視野コーンを撮影地点・方向・画角に合わせて作り直す。
+    // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
-      const base = sampleSurfaceY(ex, ez) + 3; // 地表より少し上に浮かせて見やすく
+      const lowY = elevToWorldY(VC_BOT_M);
+      const highY = elevToWorldY(VC_TOP_M);
       const half = (Math.min(Math.max(fovDeg, 1), 175) / 2) * (Math.PI / 180);
       const h0 = (headingDeg * Math.PI) / 180;
-      // コーンの長さは今のズーム（カメラ距離）に比例＝俯瞰の画面内にだいたい収まる。
-      const R = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target) * 0.55, 12, VIEWCONE_R);
-      viewConePos[0] = ex;
-      viewConePos[1] = base;
-      viewConePos[2] = ez;
-      for (let i = 0; i <= VIEWCONE_SEGS; i++) {
-        const a = h0 - half + (2 * half * i) / VIEWCONE_SEGS; // 方位角（0=北=-Z）
+      // 長さはズーム連動だが、方向が分かるよう遠くまで伸ばす（塗りは途中で透過するので長くてOK）。
+      const R = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target) * 2.2, 40, VIEWCONE_R);
+      const setV = (vi: number, x: number, y: number, z: number) => {
+        const o = vi * 3;
+        viewConePos[o] = x;
+        viewConePos[o + 1] = y;
+        viewConePos[o + 2] = z;
+      };
+      setV(vcBotApex, ex, lowY, ez);
+      setV(vcTopApex, ex, highY, ez);
+      for (let i = 0; i <= VC_N; i++) {
+        const a = h0 - half + (2 * half * i) / VC_N; // 方位角（0=北=-Z）
         const x = ex + R * Math.sin(a);
         const z = ez - R * Math.cos(a);
-        const o = (i + 1) * 3;
-        viewConePos[o] = x;
-        viewConePos[o + 1] = base;
-        viewConePos[o + 2] = z;
+        setV(vcBotArc(i), x, lowY, z);
+        setV(vcTopArc(i), x, highY, z);
       }
       viewConeGeom.attributes.position.needsUpdate = true;
       viewConeGeom.computeBoundingSphere();
-      // 縁: apex→弧開始→…→弧終端→apex
-      viewConeEdgePos[0] = ex;
-      viewConeEdgePos[1] = base;
-      viewConeEdgePos[2] = ez;
-      for (let i = 0; i <= VIEWCONE_SEGS; i++) {
-        const o = (i + 1) * 3;
-        viewConeEdgePos[o] = viewConePos[(i + 1) * 3];
-        viewConeEdgePos[o + 1] = base;
-        viewConeEdgePos[o + 2] = viewConePos[(i + 1) * 3 + 2];
-      }
-      const last = (VIEWCONE_SEGS + 2) * 3;
-      viewConeEdgePos[last] = ex;
-      viewConeEdgePos[last + 1] = base;
-      viewConeEdgePos[last + 2] = ez;
-      viewConeEdgeGeom.attributes.position.needsUpdate = true;
-      viewConeEdgeGeom.computeBoundingSphere();
       viewCone.visible = true;
       viewConeEdge.visible = true;
     };
