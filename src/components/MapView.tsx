@@ -145,6 +145,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     exitCamera: () => void;
     setCamLook: (heading: number, pitch: number) => void;
     setCamFov: (fov: number) => void;
+    setCamRoll: (deg: number) => void;
     setCamEyeHeight: (m: number) => void;
     setVerticalExaggeration: (v: number) => void;
     setSkySunDir: (x: number, y: number, z: number) => void;
@@ -194,6 +195,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [mode, setMode] = useState<"map" | "camera">("map");
   const [camHeading, setCamHeading] = useState(0);
   const [camPitch, setCamPitch] = useState(0);
+  const [camRoll, setCamRoll] = useState(0); // 水平の傾き補正（ロール）。AR微調整で使用
   const [camFov, setCamFov] = useState(CAM_FOV_DEFAULT);
   const [camEyeHeight, setCamEyeHeight] = useState(CAM_EYE_DEFAULT);
   // 写真オーバーレイ（カメラ視点に撮影画像を重ね、手動で位置合わせ）。M1=重ね描画のみ。
@@ -385,7 +387,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     // --- カメラ視点モード --- //
     let cameraMode = false;
     let mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
-    const cam = { heading: 0, pitch: 0, fov: CAM_FOV_DEFAULT, eyeX: 0, eyeZ: 0, groundElevM: 0, eyeHeightM: CAM_EYE_DEFAULT };
+    const cam = { heading: 0, pitch: 0, roll: 0, fov: CAM_FOV_DEFAULT, eyeX: 0, eyeZ: 0, groundElevM: 0, eyeHeightM: CAM_EYE_DEFAULT };
     const dirTmp = new THREE.Vector3();
     const camRay = new THREE.Raycaster();
     const tapNDC = new THREE.Vector2(); // タップのNDC（AR撮影地点レイ用）
@@ -736,6 +738,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       setCamFov: (fov) => {
         cam.fov = fov;
       },
+      setCamRoll: (deg) => {
+        cam.roll = deg;
+      },
       setCamEyeHeight: (m) => {
         cam.eyeHeightM = m;
       },
@@ -1045,6 +1050,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         camera.position.set(cam.eyeX, eyeY, cam.eyeZ);
         dirAzAlt(cam.heading, cam.pitch, dirTmp);
         camera.lookAt(cam.eyeX + dirTmp.x, eyeY + dirTmp.y, cam.eyeZ + dirTmp.z);
+        // ロール（水平の傾き補正）は最後にビュー軸(ローカルZ)まわりで回す＝向きは変えずに傾けるだけ。
+        if (cam.roll) camera.rotateZ(THREE.MathUtils.degToRad(cam.roll));
         // cam.fov は「横画角」。AR微調整中は写真枠のアスペクト比で換算＝横の写る範囲が写真と一致。
         // それ以外は全画面アスペクト。縦画角はアスペクトに追従。
         const arStage = isArStage();
@@ -1522,6 +1529,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     arPinXZRef.current = null;
     setArHeadingDeg(null);
     setArFovDeg(CAM_FOV_DEFAULT);
+    changeCamRoll(0); // 傾き補正をリセット
     setArLabels([]);
     setArStep("upload");
   };
@@ -1674,6 +1682,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const changeCamFov = (deg: number) => {
     setCamFov(deg);
     apiRef.current?.setCamFov(deg);
+  };
+  // 水平の傾き（ロール）をスライダーで補正。向きは変えずビュー軸まわりに回すだけ。
+  const changeCamRoll = (deg: number) => {
+    setCamRoll(deg);
+    apiRef.current?.setCamRoll(deg);
   };
   const compass = (deg: number) => {
     const dirs = ["北", "北東", "東", "南東", "南", "南西", "西", "北西"];
@@ -2057,6 +2070,18 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               max={CAM_FOV_MAX}
               value={Math.round(camFov)}
               onChange={(e) => changeCamFov(Number(e.target.value))}
+            />
+          </label>
+          {/* 水平の傾き（ロール）補正。向きは変えずビュー軸まわりに回すだけ（シミュ・AR共通） */}
+          <label className="cam-eye">
+            <span>水平の傾き {camRoll}°（左 ←→ 右）</span>
+            <input
+              type="range"
+              min={-45}
+              max={45}
+              step={0.5}
+              value={camRoll}
+              onChange={(e) => changeCamRoll(Number(e.target.value))}
             />
           </label>
           {/* 写真オーバーレイ操作（ARモードのみ）: 未読込なら取り込み、読込済みなら不透明度＋解除 */}
