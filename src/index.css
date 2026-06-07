@@ -320,25 +320,6 @@ body,
   background: rgba(48, 100, 160, 0.92);
   border-color: rgba(120, 180, 240, 0.65);
 }
-/* 2D/3D 切替（俯瞰地図）。コンパクトな正方形ボタン。 */
-.dim-toggle {
-  align-self: flex-end;
-  width: 38px;
-  height: 38px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #e6edf5;
-  background: rgba(18, 24, 33, 0.78);
-  border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 10px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: 20;
-}
-.dim-toggle:hover {
-  background: rgba(34, 46, 62, 0.85);
-}
 
 /* --- サイドバー --- */
 .sidebar-scrim {

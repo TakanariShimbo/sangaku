@@ -23,6 +23,9 @@ import {
   IconMoonPhase,
   IconImage,
   IconChevron,
+  IconCube,
+  IconGrid,
+  IconEye,
 } from "./icons";
 import {
   worldToLonLat,
@@ -2693,13 +2696,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {/* 右下クラスタ（マップモードのみ）: リモコン＋その下に自由視点 */}
       {mode === "map" && (
         <div className="controls-br">
-          {/* 2D(真上の地図)/3D(傾けられる地形) 切替。場所決めは2Dが楽。 */}
+          {/* 2D(真上の地図)/3D(傾けられる地形) 切替。場所決めは2Dが楽。ボタンは切替先を表示。 */}
           <button
-            className="dim-toggle"
+            className="freelook-toggle"
             title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
             onClick={() => setMap2D((v) => !v)}
           >
-            {map2D ? "3D" : "2D"}
+            {map2D ? <IconCube size={15} /> : <IconGrid size={15} />}
+            <span>{map2D ? "3D" : "2D"}</span>
           </button>
           {showRemote && (
             <div className="nav-controls">
@@ -2753,7 +2757,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
               onClick={toggleFreeLook}
             >
-              {freeLook ? "自由視点：ON" : "自由視点"}
+              <IconEye size={15} />
+              <span>{freeLook ? "自由視点：ON" : "自由視点"}</span>
             </button>
           )}
           {/* AR/ライブ: 自由に見て回った後、地点へ視点を戻す（自由視点の代わり）。 */}

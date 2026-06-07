@@ -212,3 +212,34 @@ export function IconLocate({ size = 16, className }: Props) {
     </svg>
   );
 }
+
+/** 立方体（3D表示）。アイソメトリックな箱。 */
+export function IconCube({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M12 3 L20 7.5 L12 12 L4 7.5 Z" />
+      <path d="M4 7.5 L12 12 L12 21 L4 16.5 Z" />
+      <path d="M20 7.5 L12 12 L12 21 L20 16.5 Z" />
+    </svg>
+  );
+}
+
+/** 平面グリッド（2D地図/真上）。 */
+export function IconGrid({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="1.5" />
+      <path d="M3.5 9.2 H20.5 M3.5 14.8 H20.5 M9.2 3.5 V20.5 M14.8 3.5 V20.5" />
+    </svg>
+  );
+}
+
+/** 目（自由視点）。 */
+export function IconEye({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M2 12 C5 6.5 19 6.5 22 12 C19 17.5 5 17.5 2 12 Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
