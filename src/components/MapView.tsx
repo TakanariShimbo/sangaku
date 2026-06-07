@@ -578,9 +578,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     scene.add(viewConeCenter);
     // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number, flat: boolean) => {
-      const highY = elevToWorldY(VC_TOP_M);
-      // 2D(flat)では上面に潰す＝垂直の壁が消え、上面の扇＋線だけになる。3Dでは下端まで立体。
-      const lowY = flat ? highY : elevToWorldY(VC_BOT_M);
+      // 2D(flat): 撮影地点の地表に沿わせ、深度テスト無効で地形に隠れない「地図上の注記」として描く。
+      //   高所の面だと、寄った時にカメラが面の下へ潜って扇が消えたり、山に隠れて見えなくなる。
+      //   地表に置き＋depthTest無効にすれば、ズームや山に関係なく線＋面が常に地図上に見える。
+      // 3D: 上端(VC_TOP_M)〜下端(VC_BOT_M)の立体プリズム（地形に正しく隠れる）。
+      const groundY = sampleSurfaceY(ex, ez);
+      const highY = flat ? groundY : elevToWorldY(VC_TOP_M);
+      const lowY = flat ? groundY : elevToWorldY(VC_BOT_M);
+      (viewCone.material as THREE.MeshBasicMaterial).depthTest = !flat; // 2Dは常に地図の上に重ねる
       const half = (Math.min(Math.max(fovDeg, 1), 175) / 2) * (Math.PI / 180);
       const h0 = (headingDeg * Math.PI) / 180;
       // 長さはズーム連動だが、方向が分かるよう遠くまで伸ばす（塗りは途中で透過するので長くてOK）。
