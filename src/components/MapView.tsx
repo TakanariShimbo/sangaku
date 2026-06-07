@@ -958,6 +958,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         aimAtScreen(e.clientX, e.clientY);
         return;
       }
+      // カメラ視点（一人称）では山頂の選択/非選択を切り替えない（非表示のグレー山も拾わせない）。
+      // 選択は地図（山選択フェーズ／シミュレーションの俯瞰）でのみ行う。
+      if (cameraMode) return;
       if (!peaks.points.visible) return;
       const i = peaks.pick(e.clientX - rect.left, e.clientY - rect.top, camera, mount.clientWidth, mount.clientHeight);
       if (i == null) return;
