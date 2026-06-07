@@ -1,9 +1,9 @@
 // アプリのホーム画面。入場時に出し、ここから用途別モードへ分岐する。
 // 「地形を見る」＝3D地形の俯瞰・一人称ビュー。「写真に山名をのせる」＝写真へのAR合成。
 // 「今撮る（ライブAR）」は将来枠のため当面は出さない。
-import { IconMountain, IconImage } from "./icons";
+import { IconMountain, IconImage, IconCamera } from "./icons";
 
-type Props = { onSelect: (mode: "simulation" | "ar") => void };
+type Props = { onSelect: (mode: "simulation" | "ar" | "live") => void };
 
 export default function Home({ onSelect }: Props) {
   return (
@@ -27,6 +27,13 @@ export default function Home({ onSelect }: Props) {
             </span>
             <span className="home-card-title">写真に山名をのせる</span>
             <span className="home-card-desc">撮った山の写真に山名を重ね、合成画像を書き出せます（AR）</span>
+          </button>
+          <button className="home-card" onClick={() => onSelect("live")}>
+            <span className="home-card-icon">
+              <IconCamera size={30} />
+            </span>
+            <span className="home-card-title">カメラで山名を見る</span>
+            <span className="home-card-desc">今いる場所からカメラ越しに、見えている山へ名前を重ねます（GPS・方位）</span>
           </button>
         </div>
       </div>

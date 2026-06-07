@@ -35,6 +35,12 @@ import {
 } from "../lib/mercator";
 import { readPhotoExif } from "../lib/exif";
 import {
+  requestOrientationPermission,
+  subscribeOrientation,
+  startRearCamera,
+  stopStream,
+} from "../lib/sensors";
+import {
   BASEMAPS,
   basemapById,
   clearTileCaches,
@@ -108,7 +114,8 @@ function dirAzAlt(azDeg: number, altDeg: number, out: THREE.Vector3): THREE.Vect
 }
 
 type MapViewProps = {
-  appMode: "simulation" | "ar"; // シミュレーション / AR（写真から）。ホーム画面から指定される。
+  // simulation=地形閲覧 / ar=写真からAR / live=カメラでその場AR。ホーム画面から指定される。
+  appMode: "simulation" | "ar" | "live";
   onHome: () => void; // ホーム画面へ戻る。
 };
 
@@ -126,6 +133,8 @@ type ArLabel = {
 };
 
 export default function MapView({ appMode, onHome }: MapViewProps) {
+  // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
+  const arLike = appMode === "ar" || appMode === "live";
   const mountRef = useRef<HTMLDivElement | null>(null);
   // 画面ボタンとレンダリングループで共有する操作状態（.current は callback/effect 内でのみ触る）。
   const navRef = useRef<Nav>({ panX: 0, panZ: 0, orbit: 0, tilt: 0, dolly: 0, home: false });
@@ -203,14 +212,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [photoOpacity, setPhotoOpacity] = useState(0.5);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   // ARウィザードのフェーズ: 写真→撮影地点→撮影情報→向き合わせ→山選択→書き出し。
-  const [arStep, setArStep] = useState<ArStep>("upload");
+  // ライブAR（カメラ）は写真取込が無いので地点(locate)から開始。
+  const [arStep, setArStep] = useState<ArStep>(appMode === "live" ? "locate" : "upload");
   const [arLoc, setArLoc] = useState<{ lat: number; lon: number } | null>(null); // 撮影地点
   const [arHeadingDeg, setArHeadingDeg] = useState<number | null>(null); // 撮影方位（EXIF or ②で設定）
   const [arFovDeg, setArFovDeg] = useState(CAM_FOV_DEFAULT); // 横画角（EXIF or ②で設定）
   const [arPhotoAspect, setArPhotoAspect] = useState<number | null>(null); // 仕上げ画面の枠アスペクト用
   // 出力(仕上げ)で編集する各山ラベル。座標は写真フレーム内の正規化値(0..1)。
   const [arLabels, setArLabels] = useState<ArLabel[]>([]);
-  const arStepRef = useRef<ArStep>("upload"); // ループから参照
+  const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
   const arPinXZRef = useRef<{ x: number; z: number } | null>(null); // 撮影地点ピンのワールドXZ
   const arPinElRef = useRef<HTMLDivElement | null>(null); // 撮影地点ピンのDOM（先端を地表に接地）
   const arPhotoAspectRef = useRef<number | null>(null); // 撮影写真の縦横比(W/H)。3D枠の整形に使う
@@ -219,6 +229,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
   const arDragRef = useRef<{ i: number; kind: "dot" | "label" } | null>(null); // ドラッグ中の対象
+  // --- ライブAR（カメラでその場AR）専用 --- //
+  const liveVideoRef = useRef<HTMLVideoElement | null>(null); // 背面カメラのライブ映像
+  const liveStreamRef = useRef<MediaStream | null>(null); // 取得中のカメラストリーム（解放用）
+  const liveOriUnsubRef = useRef<(() => void) | null>(null); // 方位センサ購読の解除
+  const [liveCompassDeg, setLiveCompassDeg] = useState<number | null>(null); // コンパス方位の生値
+  const [liveStatus, setLiveStatus] = useState<string | null>(null); // GPS/センサ/カメラの状態メッセージ
   // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
   const [openSec, setOpenSec] = useState<Record<string, boolean>>({
     search: true,
@@ -431,7 +447,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     };
     // AR微調整/書き出しで写真枠に合わせて描画するか。
     const isArStage = () =>
-      appModeRef.current === "ar" &&
+      (appModeRef.current === "ar" || appModeRef.current === "live") &&
       (arStepRef.current === "align" || arStepRef.current === "export") &&
       arPhotoAspectRef.current != null;
 
@@ -1067,13 +1083,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           camera.aspect = aspect;
           camera.updateProjectionMatrix();
         }
-        // 写真オーバーレイDOMを枠にぴったり合わせる（3D描画と同じ矩形）。
-        if (arStage && stageRect && arPhotoElRef.current) {
-          const s = arPhotoElRef.current.style;
-          s.left = `${stageRect.x}px`;
-          s.top = `${stageRect.y}px`;
-          s.width = `${stageRect.w}px`;
-          s.height = `${stageRect.h}px`;
+        // 写真／ライブ映像オーバーレイDOMを枠にぴったり合わせる（3D描画と同じ矩形）。
+        if (arStage && stageRect) {
+          const overlay = arPhotoElRef.current ?? liveVideoRef.current;
+          if (overlay) {
+            const s = overlay.style;
+            s.left = `${stageRect.x}px`;
+            s.top = `${stageRect.y}px`;
+            s.width = `${stageRect.w}px`;
+            s.height = `${stageRect.h}px`;
+          }
         }
         if (reticleRef.current) reticleRef.current.style.display = "none";
         // 太陽・月：カメラ視点では切り抜かず、視点(目)を中心に遠方の空へ配置。
@@ -1283,15 +1302,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
   // 向き決め(②)・山選択(③)の俯瞰中、視野コーンを地図上に描画（写る方向の山を選びやすく）。
   useEffect(() => {
-    if (appMode === "ar" && (arStep === "params" || arStep === "select") && arLoc) {
+    if (arLike && (arStep === "params" || arStep === "select") && arLoc) {
       apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg);
     } else {
       apiRef.current?.hideViewCone();
     }
-  }, [appMode, arStep, arLoc, arHeadingDeg, arFovDeg]);
+  }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
+  // ライブARは別途 startLiveLocate で現在地→撮影地点に置くのでここはスキップ。
   useEffect(() => {
+    if (appMode === "live") return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -1302,7 +1323,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       () => undefined, // 失敗・拒否時は既定ビューのまま
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     );
-  }, []);
+  }, [appMode]);
 
   // 太陽・月: 観測点(=視点中心)＋日時から sky/軌跡を計算して反映。中心追従はループ側。
   useEffect(() => {
@@ -1464,10 +1485,98 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArLoc({ lat, lon });
     arPinXZRef.current = { x: mercXToWorld(lonToMercX(lon)), z: mercYToWorld(latToMercY(lat)) };
   };
+  // === ライブAR（カメラでその場AR）専用ヘルパ ===
+  // 現在地(GPS)を取得して撮影地点に置く。取れなければメッセージ（地図タップでも指定可）。
+  const startLiveLocate = () => {
+    if (!navigator.geolocation) {
+      setLiveStatus("この端末では現在地を取得できません。地図をタップして指定してください");
+      return;
+    }
+    setLiveStatus("現在地を取得中…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLiveStatus(null);
+        const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        homeLocRef.current = loc;
+        placeArPoint(loc.lat, loc.lon);
+        apiRef.current?.flyTo(loc);
+      },
+      (err) => {
+        setLiveStatus(
+          err.code === err.PERMISSION_DENIED
+            ? "位置情報が許可されていません。地図をタップして指定してください"
+            : "現在地を取得できませんでした。地図をタップして指定してください",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+  // 背面カメラを開始して video に流す（微調整=ライブAR の背景）。
+  const startLiveCamera = async () => {
+    try {
+      stopStream(liveStreamRef.current);
+      const stream = await startRearCamera();
+      liveStreamRef.current = stream;
+      const v = liveVideoRef.current;
+      if (v) {
+        v.srcObject = stream;
+        await v.play().catch(() => {});
+      }
+    } catch (e) {
+      setLiveStatus(e instanceof Error ? e.message : "カメラを開始できませんでした");
+    }
+  };
+  const stopLiveCamera = () => {
+    stopStream(liveStreamRef.current);
+    liveStreamRef.current = null;
+    const v = liveVideoRef.current;
+    if (v) v.srcObject = null;
+  };
+  // ライブのやり直し: 地点(GPS)からやり直す。
+  const restartLive = () => {
+    if (mode === "camera") exitCameraMode();
+    stopLiveCamera();
+    apiRef.current?.setControlMode("map");
+    setArHeadingDeg(null);
+    setArFovDeg(CAM_FOV_DEFAULT);
+    changeCamRoll(0);
+    setArStep("locate");
+    startLiveLocate();
+  };
+  // ライブAR起動: マウント時に現在地(GPS)を取得して地点フェーズへ。終了時にカメラ/センサ解放。
+  useEffect(() => {
+    // 起動直後に一度だけGPS取得を開始（ステータス文言の setState を含むため明示的に許可）。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (appMode === "live") startLiveLocate();
+    return () => {
+      stopLiveCamera();
+      liveOriUnsubRef.current?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ライブAR 向き決め(②): 端末の方位センサで撮影方向を追従（スマホを水平にして向ける）。
+  useEffect(() => {
+    if (appMode !== "live" || arStep !== "params") return;
+    const unsub = subscribeOrientation((r) => {
+      if (r.headingDeg == null) return;
+      setLiveCompassDeg(r.headingDeg);
+      setArHeadingDeg((prev) => {
+        if (prev == null) return r.headingDeg;
+        const diff = ((r.headingDeg! - prev + 540) % 360) - 180; // -180..180
+        return Math.abs(diff) < 0.8 ? prev : r.headingDeg; // 微小変化は無視（再描画抑制）
+      });
+    });
+    liveOriUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      liveOriUnsubRef.current = null;
+    };
+  }, [appMode, arStep]);
   // 「合わせる」フェーズへ: 撮影地点に着地し、向き・画角を初期化。
   const goAlign = (loc: { lat: number; lon: number }, headingDeg: number | null, fovDeg: number) => {
     setArStep("align");
     enterCameraMode({ lon: loc.lon, lat: loc.lat, headingDeg: headingDeg ?? undefined, fovDeg });
+    if (appMode === "live") startLiveCamera(); // ライブARは背面カメラを背景に
   };
   // 写真を選んだら EXIF を読み、揃っていれば一気に、欠けていれば必要なフェーズへ進む。
   const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1497,6 +1606,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 撮影地点フェーズの「ここで決定」: 向きと画角をざっくり決めるフェーズへ（常に）。
   const confirmArLocate = () => {
     if (!arLoc) return;
+    if (appMode === "live") requestOrientationPermission(); // iOS等の方位センサ許可（ユーザー操作起点）
     apiRef.current?.frameAimView(arLoc.lon, arLoc.lat); // 撮影地点中心の北上俯瞰へ
     apiRef.current?.setControlMode("map"); // パン/回転/ズーム可。方向はタップで指定
     setArStep("params");
@@ -1556,6 +1666,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     if (!arLoc) return;
     setArHeadingDeg(camHeading); // 微調整を反映
     setArFovDeg(camFov);
+    if (appMode === "live") stopLiveCamera(); // ライブは一旦カメラ停止（再入で再開）
     exitCameraMode(); // 一人称→地図
     apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
     apiRef.current?.setControlMode("map");
@@ -1766,13 +1877,34 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       <div className="mapview-canvas" ref={mountRef} />
 
       {/* 写真オーバーレイ（カメラ視点でのみ。位置・サイズはループが写真枠に合わせる） */}
-      {mode === "camera" && photoUrl && (
+      {mode === "camera" && appMode !== "live" && photoUrl && (
         <img
           ref={arPhotoElRef}
           className="photo-overlay"
           src={photoUrl}
           alt=""
           style={{ opacity: photoOpacity }}
+        />
+      )}
+
+      {/* ライブAR: 背面カメラ映像オーバーレイ（微調整=ライブARの背景。枠はループが追従）。
+          メタデータ読込でアスペクトを設定→3D枠が映像比に合う。 */}
+      {appMode === "live" && mode === "camera" && (
+        <video
+          ref={liveVideoRef}
+          className="photo-overlay"
+          autoPlay
+          playsInline
+          muted
+          style={{ opacity: photoOpacity, objectFit: "cover" }}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth && v.videoHeight) {
+              const a = v.videoWidth / v.videoHeight;
+              arPhotoAspectRef.current = a;
+              setArPhotoAspect(a);
+            }
+          }}
         />
       )}
 
@@ -1800,24 +1932,27 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
-      {/* AR進行表示（地点 → 向き画角 → 山選択 → 微調整 → 出力） */}
-      {appMode === "ar" && arStep !== "upload" && (
+      {/* 進行表示（写真AR: 地点→向き画角→山選択→微調整→出力 / ライブ: 出力なし） */}
+      {arLike && arStep !== "upload" && (
         <div className="ar-steps">
-          {(["locate", "params", "select", "align", "export"] as const).map((k, idx) => {
-            const order: Record<string, number> = {
-              locate: 0,
-              params: 1,
-              select: 2,
-              align: 3,
-              export: 4,
-            };
-            const cur = order[arStep];
+          {(appMode === "live"
+            ? (["locate", "params", "select", "align"] as ArStep[])
+            : (["locate", "params", "select", "align", "export"] as ArStep[])
+          ).map((k, idx, arr) => {
+            const cur = arr.indexOf(arStep);
             const cls = idx < cur ? "done" : idx === cur ? "active" : "todo";
-            const label = { locate: "地点", params: "向き画角", align: "微調整", select: "山選択", export: "出力" }[k];
+            const label: Record<ArStep, string> = {
+              upload: "",
+              locate: "地点",
+              params: "向き画角",
+              align: appMode === "live" ? "確認" : "微調整",
+              select: "山選択",
+              export: "出力",
+            };
             return (
               <span key={k} className={`ar-step is-${cls}`}>
                 <b>{idx + 1}</b>
-                <span className="ar-step-label">{label}</span>
+                <span className="ar-step-label">{label[k]}</span>
               </span>
             );
           })}
@@ -1826,26 +1961,31 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
       {/* 撮影地点ピン（AR地図フェーズ：地点/向き決め/山選択で表示。位置はループが追従）。
           先端をDEM表面に合わせて接地（sampleSurfaceY修正で浮かない）。 */}
-      {appMode === "ar" && mode === "map" && (
+      {arLike && mode === "map" && (
         <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
           <IconPin size={30} />
         </div>
       )}
 
       {/* ② 撮影地点フェーズ: 案内＋ピン＋決定バー */}
-      {appMode === "ar" && arStep === "locate" && (
+      {arLike && arStep === "locate" && (
         <>
           <div className="ar-locate-hint">
             <IconPin size={15} />
             <span>
-              {arLoc
-                ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
-                : "撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索"}
+              {appMode === "live"
+                ? liveStatus ??
+                  (arLoc
+                    ? "現在地です。この位置で合っていますか？ ずれていれば地図をタップして調整できます"
+                    : "現在地を取得しています…（地図をタップして指定もできます）")
+                : arLoc
+                  ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
+                  : "撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索"}
             </span>
           </div>
           <div className="ar-bottom-bar">
-            <button className="ar-btn-sub" onClick={restartAr}>
-              やり直す
+            <button className="ar-btn-sub" onClick={appMode === "live" ? restartLive : restartAr}>
+              {appMode === "live" ? "現在地を取り直す" : "やり直す"}
             </button>
             <button className="ar-btn-main" disabled={!arLoc} onClick={confirmArLocate}>
               ここで決定
@@ -1855,12 +1995,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       )}
 
       {/* ⑤ 山選択フェーズ: 3D俯瞰地図で山頂をタップ選択（奥行きが分かる） */}
-      {appMode === "ar" && arStep === "select" && (
+      {arLike && arStep === "select" && (
         <>
           <div className="ar-locate-hint">
             <IconMountain size={15} />
             <span>
-              写真に写る山をタップして選びます。地図は自由に移動・拡大できます（右下「撮影地点に戻る」で復帰）
+              {appMode === "live" ? "見えている山を" : "写真に写る山を"}
+              タップして選びます。地図は自由に移動・拡大できます（右下「撮影地点に戻る」で復帰）
             </span>
           </div>
           <div className="ar-bottom-bar">
@@ -1870,19 +2011,26 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </button>
             <span className="ar-select-count">選択 {peakSelCount} 山</span>
             <button className="ar-btn-main" onClick={goAlignFromSelect}>
-              微調整へ
+              {appMode === "live" ? "確認へ" : "微調整へ"}
               <IconChevron dir="right" size={14} />
             </button>
           </div>
         </>
       )}
 
-      {/* ③ 向き・画角フェーズ: 地図上の視野コーンで方向と画角を決める */}
-      {appMode === "ar" && arStep === "params" && (
+      {/* ③ 向き・画角フェーズ: 地図上の視野コーンで方向と画角を決める。
+          写真AR=地図タップで方向 / ライブ=端末の方位センサで追従（スマホを水平に）。 */}
+      {arLike && arStep === "params" && (
         <>
           <div className="ar-locate-hint">
             <IconPin size={15} />
-            <span>地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。</span>
+            <span>
+              {appMode === "live"
+                ? `スマホを地面と水平にして見たい方へ向けてください（方位センサで追従${
+                    liveCompassDeg == null ? "／取得待ち…" : ""
+                  }）。スライダーで画角を調整。`
+                : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。"}
+            </span>
           </div>
           <div className="ar-aim-bar">
             <div className="ar-readout">
@@ -2111,6 +2259,21 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               )}
             </div>
           )}
+          {/* ライブAR: カメラ映像の不透明度（3Dと重ねて山位置を確認） */}
+          {appMode === "live" && (
+            <div className="cam-photo">
+              <label className="cam-photo-opacity">
+                <span>カメラ映像の不透明度 {Math.round(photoOpacity * 100)}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(photoOpacity * 100)}
+                  onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
+                />
+              </label>
+            </div>
+          )}
           {/* シミュレーションの操作ヒント */}
           {appMode === "simulation" && (
             <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
@@ -2129,6 +2292,23 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 <button className="ar-btn-main" onClick={goExport}>
                   仕上げ
                   <IconChevron dir="right" size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+          {/* ライブAR 確認: いま見えている山と、選んだ山が合っているか確認・微調整（書き出しなし） */}
+          {appMode === "live" && arStep === "align" && (
+            <div className="ar-phase-foot">
+              <span className="cam-hint">
+                選んだ山名がカメラ映像に重なります。ドラッグで向き・ピンチ/ホイールで画角・スライダーで傾きを合わせて確認。
+              </span>
+              <div className="ar-phase-foot-row">
+                <button className="ar-btn-sub" onClick={backToSelect}>
+                  <IconChevron dir="left" size={14} />
+                  山選択
+                </button>
+                <button className="ar-btn-main" onClick={onHome}>
+                  完了
                 </button>
               </div>
             </div>
@@ -2506,15 +2686,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               {freeLook ? "自由視点：ON" : "自由視点"}
             </button>
           )}
-          {/* AR: 自由に見て回った後、撮影地点へ視点を戻す（自由視点の代わり）。 */}
-          {appMode === "ar" && arLoc && (
+          {/* AR/ライブ: 自由に見て回った後、地点へ視点を戻す（自由視点の代わり）。 */}
+          {arLike && arLoc && mode === "map" && (
             <button
               className="freelook-toggle"
-              title="フェーズ1で決めた撮影地点へ視点を戻す"
+              title="決めた地点へ視点を戻す"
               onClick={recenterAr}
             >
               <IconPin size={14} />
-              <span>撮影地点に戻る</span>
+              <span>{appMode === "live" ? "現在地に戻る" : "撮影地点に戻る"}</span>
             </button>
           )}
         </div>
