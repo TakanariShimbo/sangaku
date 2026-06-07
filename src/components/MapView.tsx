@@ -462,14 +462,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     // --- AR向き決め: 撮影地点から「写る方向・範囲」を示す視野コーン（扇形）を地図に描く --- //
     // 扇は地形に沿わせて（ドレープ）地図に貼り付ける。2D/3Dとも同じ見た目で、3Dでは手前の尾根が
     // 扇を遮り、高い山は扇を突き抜けるので「地面に直接描いた」ように見える（プリズムや高い面は使わない）。
-    const VC_N = 24; // 角度（扇の弧）の分割数
-    const VC_NR = 10; // 半径方向の分割数（apex付近を密にして地形に追従。レイキャスト数とのバランス）
+    const VC_N = 28; // 角度（扇の弧）の分割数
+    const VC_NR = 16; // 半径方向の分割数（細かいほど地表に密着。レイキャスト数とのバランス）
     const VIEWCONE_R = 180; // コーンの長さ(world)の上限。線を遠くまで伸ばして方向を示す
     const VC_COL = { r: 0.37, g: 0.63, b: 0.9 }; // 塗り・線の共通色
     const VC_APEX_ALPHA = 0.34; // 塗りの中心の濃さ（外周へ0でフェード）
     const VC_LINE_ALPHA = 0.5; // 線（中心・両端）の中心の濃さ（外周へ0）
-    const vcLift = elevToWorldY(15); // 地表からのわずかな浮き（塗りの z-fight 回避）
-    const vcLineLift = elevToWorldY(35); // 線は塗りより少し上に置いて埋もれさせない
+    // 頂点はレイキャストで「表示中の地表」に乗せる。持ち上げはほぼ0にして地面に貼り付かせ、
+    // z-fight は polygonOffset で回避（持ち上げると3Dで浮いて見えるため）。
+    const vcLift = elevToWorldY(2);
+    const vcLineLift = elevToWorldY(5); // 線は塗りのごくわずか上（塗りに埋もれさせない）
     const gv = (r: number, i: number) => r * (VC_N + 1) + i; // 塗りグリッドの頂点番号（リングr×列i）
     // 塗り（扇）: (VC_NR+1)リング × (VC_N+1)列 の三角形グリッドを地表にドレープ。
     const viewConePos = new Float32Array((VC_NR + 1) * (VC_N + 1) * 3);
@@ -505,9 +507,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         depthTest: true, // 地形に正しく隠れる（地面に貼り付いて見える）
         depthWrite: false,
         side: THREE.DoubleSide,
-        polygonOffset: true, // 地表との z-fight を避けて手前に寄せる
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
+        polygonOffset: true, // 地表との z-fight を避けて手前に寄せる（地面に貼り付かせる）
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
       }),
     );
     viewCone.renderOrder = 998;
@@ -541,8 +543,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         depthTest: true, // 線も地形に隠れる（地面に沿う）
         depthWrite: false,
         polygonOffset: true,
-        polygonOffsetFactor: -3,
-        polygonOffsetUnits: -3,
+        polygonOffsetFactor: -6,
+        polygonOffsetUnits: -6,
       }),
     );
     viewConePlanes.renderOrder = 999;
@@ -562,8 +564,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         viewConePos[o] = ex; viewConePos[o + 1] = apexY; viewConePos[o + 2] = ez;
       }
       for (let r = 1; r <= VC_NR; r++) {
-        const frac = r / VC_NR;
-        const radius = R * frac * frac; // apex付近を密に（見える中心側ほど地形に細かく追従）
+        const radius = R * (r / VC_NR); // 等間隔リングで全体を均一に地表へ追従させる
         for (let i = 0; i <= VC_N; i++) {
           const a = h0 - half + (2 * half * i) / VC_N; // 方位角（0=北=-Z）
           const x = ex + radius * Math.sin(a);
@@ -1259,12 +1260,18 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
   // 向き決め(②)・山選択(③)の俯瞰中、視野コーンを地図に描画（写る方向の山を選びやすく）。
   // 地形にドレープするので2D/3D共通の見た目。dimは関与しない。
+  // ドレープは頂点ごとに地表をレイキャストするため、FOVスライダー等の連続変更は
+  // デバウンスして負荷を吸収（指を止めた所で貼り直す）。
   useEffect(() => {
-    if (arLike && (arStep === "params" || arStep === "select") && arLoc) {
-      apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg);
-    } else {
+    if (!(arLike && (arStep === "params" || arStep === "select") && arLoc)) {
       apiRef.current?.hideViewCone();
+      return;
     }
+    const { lon, lat } = arLoc;
+    const h = arHeadingDeg ?? 0;
+    const fov = arFovDeg;
+    const id = setTimeout(() => apiRef.current?.setViewCone(lon, lat, h, fov), 60);
+    return () => clearTimeout(id);
   }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
