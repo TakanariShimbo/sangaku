@@ -1219,11 +1219,15 @@ body,
 /* 撮影地点ピン（地表に追従。下端が地点を指す） */
 .ar-pin {
   position: absolute;
-  transform: translate(-50%, -100%);
+  /* ピン先端（アイコン高さの約87.5%の位置）を撮影地点に合わせる＝DEM表面にちょうど刺さる */
+  transform: translate(-50%, -87.5%);
   color: #ff5a3c;
   pointer-events: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   z-index: 6;
+}
+.ar-pin svg {
+  display: block; /* インラインSVGの下余白を消し、要素高さ＝アイコン高さにする */
 }
 
 /* 下部の決定バー（地点/情報フェーズ共通） */

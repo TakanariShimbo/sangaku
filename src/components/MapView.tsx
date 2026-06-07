@@ -503,12 +503,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     // 縁（上下の弧＋角の縦エッジ）。位置はメッシュと共有し、線分で描く。
     const viewConeEdgeGeom = new THREE.BufferGeometry();
     viewConeEdgeGeom.setAttribute("position", viewConeGeom.getAttribute("position"));
+    // 放射線（側辺）だけ描く。遠端の弧（コ）は出さない＝グラデーションの透過を邪魔しない。
     const edgeIdx: number[] = [];
-    for (let i = 0; i < VC_N; i++) edgeIdx.push(vcTopArc(i), vcTopArc(i + 1)); // 天の弧
-    for (let i = 0; i < VC_N; i++) edgeIdx.push(vcBotArc(i), vcBotArc(i + 1)); // 底の弧
     edgeIdx.push(vcTopApex, vcTopArc(0), vcTopApex, vcTopArc(VC_N)); // 天の側辺
     edgeIdx.push(vcBotApex, vcBotArc(0), vcBotApex, vcBotArc(VC_N)); // 底の側辺
-    edgeIdx.push(vcBotApex, vcTopApex, vcBotArc(0), vcTopArc(0), vcBotArc(VC_N), vcTopArc(VC_N)); // 縦
     viewConeEdgeGeom.setIndex(edgeIdx);
     const viewConeEdge = new THREE.LineSegments(
       viewConeEdgeGeom,
@@ -518,6 +516,36 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewConeEdge.frustumCulled = false;
     viewConeEdge.visible = false;
     scene.add(viewConeEdge);
+    // 画角の中心面（撮影地点から中心方向へ伸びる垂直の面）。真上から見ると中心線に見える。
+    // 頂点: 0=apex下, 1=apex上, 2=遠端下, 3=遠端上
+    const viewConeCenterPos = new Float32Array(4 * 3);
+    const viewConeCenterGeom = new THREE.BufferGeometry();
+    viewConeCenterGeom.setAttribute("position", new THREE.BufferAttribute(viewConeCenterPos, 3));
+    {
+      const cr = 0.62;
+      const cg = 0.8;
+      const cb = 1.0;
+      const col = new Float32Array([
+        cr, cg, cb, 0.5, cr, cg, cb, 0.5, // apex（中心は濃く）
+        cr, cg, cb, 0, cr, cg, cb, 0, // 遠端は透明
+      ]);
+      viewConeCenterGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
+    }
+    viewConeCenterGeom.setIndex([0, 2, 3, 0, 3, 1]);
+    const viewConeCenter = new THREE.Mesh(
+      viewConeCenterGeom,
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    viewConeCenter.renderOrder = 998;
+    viewConeCenter.frustumCulled = false;
+    viewConeCenter.visible = false;
+    scene.add(viewConeCenter);
     // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
       const lowY = elevToWorldY(VC_BOT_M);
@@ -541,10 +569,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         setV(vcBotArc(i), x, lowY, z);
         setV(vcTopArc(i), x, highY, z);
       }
+      // 中心面（中心方向 h0 へ R まで伸びる垂直の面）。
+      const cfx = ex + R * Math.sin(h0);
+      const cfz = ez - R * Math.cos(h0);
+      viewConeCenterPos.set([ex, lowY, ez, ex, highY, ez, cfx, lowY, cfz, cfx, highY, cfz]);
+      viewConeCenterGeom.attributes.position.needsUpdate = true;
       viewConeGeom.attributes.position.needsUpdate = true;
       viewConeGeom.computeBoundingSphere();
+      viewConeCenterGeom.computeBoundingSphere();
       viewCone.visible = true;
       viewConeEdge.visible = true;
+      viewConeCenter.visible = true;
     };
 
     const getCenter = (): LonLat | null => {
@@ -712,7 +747,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         const h = sampleSurfaceY(ex, ez);
         // 現在のズームを維持しつつ、極端に引きすぎ/寄りすぎは適度に収める。
         const dist = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target), 12, 160);
-        const polar = THREE.MathUtils.degToRad(8); // 真上から8°だけ南へ（北上＆真上の特異点回避）
+        const polar = 0; // 真上（扇が立体に見えない）。OrbitControlsのmakeSafeが特異点を微小回避し北上で安定
         camera.up.set(0, 1, 0);
         flyGoal = {
           pos: new THREE.Vector3(ex, h + dist * Math.cos(polar), ez + dist * Math.sin(polar)),
@@ -734,6 +769,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       hideViewCone: () => {
         viewCone.visible = false;
         viewConeEdge.visible = false;
+        viewConeCenter.visible = false;
       },
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
@@ -1139,6 +1175,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       (viewCone.material as THREE.Material).dispose();
       viewConeEdge.geometry.dispose();
       (viewConeEdge.material as THREE.Material).dispose();
+      viewConeCenter.geometry.dispose();
+      (viewConeCenter.material as THREE.Material).dispose();
       celestial.dispose();
       skyDome.dispose();
       peaks.dispose();
