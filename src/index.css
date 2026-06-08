@@ -960,13 +960,6 @@ body,
 /* --- ベースマップ切替（サイドバー内・折返しグリッド） --- */
 
 /* --- オフライン保存（事前ロード、サイドバー内） --- */
-.save-note {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #aeb8c6;
-}
-
 .save-field {
   display: flex;
   flex-direction: column;

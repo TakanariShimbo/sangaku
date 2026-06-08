@@ -2108,9 +2108,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // オフライン保存の操作。
   const offlineControls = (
     <>
-      <p className="save-note">
-        地図を動かして保存したい範囲を画面中央に合わせ、中心地点に設定してください。半径・詳細度ぶんを保存します。
-      </p>
       <button className="save-btn" onClick={captureCenter} disabled={downloading}>
         画面中央を中心地点にする
       </button>
@@ -2203,9 +2200,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   );
   // モードのアナウンス（タイトル直下に出す短い案内）。
   const modeHint = showCelestial
-    ? "日時を変えると、その地点から見た太陽・月の方位・高度が変わります。"
+    ? "地図で地点を合わせ、下の「太陽・月」で日時を変えると、その地点の太陽・月の方位・高度がわかります。「カメラ」で立てば空の位置で確認できます。"
     : isOffline
-      ? "保存したい範囲を画面中央に合わせて、下の「ダウンロード」で保存します。"
+      ? "保存したい範囲を画面中央に合わせ、「画面中央を中心地点にする」で中心を決めます。半径・詳細度を選び「ダウンロード」で保存します。"
       : "地図をドラッグ／検索で移動します。「カメラ」で立つと一人称で見回せます。";
   // アナウンス（タイトル直下の案内）。全モード共通の体裁：先頭にアナウンスアイコン＋本文。
   const announce = (text: React.ReactNode) => (
@@ -2379,7 +2376,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                           }）。地図タップ／下のボタンで固定して微調整できます。`
                         : "固定中です。地図をタップして向きを微調整、または下のボタンで方位センサに戻せます。スライダーで画角を調整します。"
                       : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整します。"
-                    : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に移動・拡大できます（上の「${appMode === "live" ? "現在地" : "撮影地点"}に戻る」で復帰）。`,
+                    : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に動かせます。ずれたら「${appMode === "live" ? "地点に戻る" : "撮影地点へ"}」で元の構図に戻せます。`,
               )}
               {/* 操作（現在地・3D/2D・撮影地点へ） */}
               {dockControls}
@@ -2643,7 +2640,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <>
           {/* アナウンス（タイトル直下） */}
           {simView
-            ? announce("ドラッグで見回します。ホイール／ピンチで画角を変えられます。")
+            ? announce("ドラッグで見回します。ホイール／ピンチで画角、「地図」で俯瞰に戻れます。")
             : arStep === "align"
               ? announce(
                   appMode === "live"
