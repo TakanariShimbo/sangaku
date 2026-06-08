@@ -218,9 +218,6 @@ body,
   flex-direction: column;
   gap: 8px;
 }
-.mode-panel-recenter {
-  align-self: flex-start;
-}
 .cam-readout {
   display: flex;
   justify-content: space-around;

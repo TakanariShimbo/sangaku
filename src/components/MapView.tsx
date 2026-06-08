@@ -1799,10 +1799,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
 
   // --- 太陽・月操作 --- //
-  // 観測点を「今見ている地点」に合わせ直す（celestialパネルのボタン用）。
-  const recenterSunObserver = () => {
-    setSunObserver(apiRef.current?.getCenter() ?? null);
-  };
   const setSunNow = () => {
     const d = new Date();
     setDateStr(toDateInput(d));
@@ -2538,9 +2534,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
               />
-              <button className="dt-now mode-panel-recenter" onClick={recenterSunObserver}>
-                この地点（画面中央）で計算
-              </button>
               {skyInfo && (
                 <div className="sky-card">
                   <div className="sky-row">
