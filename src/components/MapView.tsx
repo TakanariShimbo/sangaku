@@ -2197,6 +2197,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       <IconMountain size={15} /> 地形を見る
     </>
   );
+  // モードのアナウンス（タイトル直下に出す短い案内）。
+  const modeHint = showCelestial
+    ? "日時を変えると、その地点から見た太陽・月の方位・高度が変わります。"
+    : isOffline
+      ? "保存したい範囲を画面中央に合わせて、下の「ダウンロード」で保存します。"
+      : "地図をドラッグ・検索で移動。「カメラ」で立つと一人称で見回せます。";
   // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
   const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
     const open = dockSecOpen[id] ?? true;
@@ -2343,149 +2349,118 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {arPanelOpen && (
             <div className="ar-dock-body">
-            {dockControls}
-          {arStep === "locate" && (
-            <>
+              {/* アナウンス（タイトル直下） */}
               <div className="ar-hint">
-                <IconPin size={15} />
+                {arStep === "select" ? <IconMountain size={15} /> : <IconPin size={15} />}
                 <span>
-                  {appMode === "live"
-                    ? liveStatus ??
-                      (arLoc
-                        ? "現在地です。この位置で合っていますか？ ずれていれば地図をタップして調整できます"
-                        : "現在地を取得しています…（地図をタップして指定もできます）")
-                    : arLoc
-                      ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
-                      : "撮影地点を選んでください — 地図をタップ、または下の検索で指定"}
+                  {arStep === "locate"
+                    ? appMode === "live"
+                      ? liveStatus ??
+                        (arLoc
+                          ? "現在地です。この位置で合っていますか？ ずれていれば地図をタップして調整できます"
+                          : "現在地を取得しています…（地図をタップして指定もできます）")
+                      : arLoc
+                        ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
+                        : "撮影地点を選んでください — 地図をタップ、または下の検索で指定"
+                    : arStep === "params"
+                      ? appMode === "live"
+                        ? liveFollow
+                          ? `スマホを地面と水平にして見たい方へ向けてください（方位センサで追従${
+                              liveCompassDeg == null ? "／取得待ち…" : "中"
+                            }）。地図タップ or 下のボタンで固定して微調整できます。`
+                          : "固定中です。地図をタップして向きを微調整、または下のボタンで方位センサに戻せます。スライダーで画角を調整。"
+                        : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。"
+                      : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に移動・拡大できます（上の「${appMode === "live" ? "現在地" : "撮影地点"}に戻る」で復帰）`}
                 </span>
               </div>
-              {appMode !== "live" && dockSection("arsearch", "検索", searchPanel)}
-              <div className="ar-dock-actions">
-                {appMode === "live" ? (
-                  <button className="ar-btn-sub" onClick={restartLive}>
-                    現在地を取り直す
-                  </button>
-                ) : (
-                  <button
-                    className="ar-btn-sub"
-                    onClick={resetToPhotoLoc}
-                    disabled={!arPhotoLoc}
-                    title={arPhotoLoc ? "写真の位置情報(GPS)に撮影地点を戻す" : "この写真に位置情報がありません"}
-                  >
-                    写真の位置に戻す
-                  </button>
+              {/* 操作（現在地・3D/2D・撮影地点へ） */}
+              {dockControls}
+              {/* 内容 */}
+              {arStep === "locate" && appMode !== "live" && dockSection("arsearch", "検索", searchPanel)}
+              {arStep === "params" &&
+                dockSection(
+                  "arparams",
+                  "向き・画角",
+                  <>
+                    <div className="cam-readout">
+                      <div className="cam-stat">
+                        <span>方向</span>
+                        <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
+                      </div>
+                      <div className="cam-stat">
+                        <span>横画角</span>
+                        <b>{Math.round(arFovDeg)}°</b>
+                      </div>
+                    </div>
+                    {appMode === "live" && (
+                      <button className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`} onClick={() => setLiveFollow((v) => !v)}>
+                        <IconLocate size={14} />
+                        {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
+                      </button>
+                    )}
+                    {camSlider(
+                      <>
+                        画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+                      </>,
+                      `${Math.round(arFovDeg)}°`,
+                      <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
+                    )}
+                  </>,
                 )}
-                <button
-                  className="ar-btn-main ar-btn--icon"
-                  title="ここで決定（次へ）"
-                  aria-label="ここで決定（次へ）"
-                  disabled={!arLoc}
-                  onClick={confirmArLocate}
-                >
-                  <IconChevron dir="right" size={18} />
-                </button>
-              </div>
-            </>
-          )}
-
-          {arStep === "params" && (
-            <>
-              <div className="ar-hint">
-                <IconPin size={15} />
-                <span>
-                  {appMode === "live"
-                    ? liveFollow
-                      ? `スマホを地面と水平にして見たい方へ向けてください（方位センサで追従${
-                          liveCompassDeg == null ? "／取得待ち…" : "中"
-                        }）。地図タップ or 下のボタンで固定して微調整できます。`
-                      : "固定中です。地図をタップして向きを微調整、または下のボタンで方位センサに戻せます。スライダーで画角を調整。"
-                    : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。"}
-                </span>
-              </div>
-              {dockSection(
-                "arparams",
-                "向き・画角",
-                <>
-                  <div className="cam-readout">
-                    <div className="cam-stat">
-                      <span>方向</span>
-                      <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
-                    </div>
-                    <div className="cam-stat">
-                      <span>横画角</span>
-                      <b>{Math.round(arFovDeg)}°</b>
-                    </div>
-                  </div>
-                  {appMode === "live" && (
+              {/* 進行ボタン（最下部） */}
+              {arStep === "locate" && (
+                <div className="ar-dock-actions">
+                  {appMode === "live" ? (
+                    <button className="ar-btn-sub" onClick={restartLive}>
+                      現在地を取り直す
+                    </button>
+                  ) : (
                     <button
-                      className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`}
-                      onClick={() => setLiveFollow((v) => !v)}
+                      className="ar-btn-sub"
+                      onClick={resetToPhotoLoc}
+                      disabled={!arPhotoLoc}
+                      title={arPhotoLoc ? "写真の位置情報(GPS)に撮影地点を戻す" : "この写真に位置情報がありません"}
                     >
-                      <IconLocate size={14} />
-                      {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
+                      写真の位置に戻す
                     </button>
                   )}
-                  {camSlider(
-                    <>
-                      画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
-                    </>,
-                    `${Math.round(arFovDeg)}°`,
-                    <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
-                  )}
-                </>,
+                  <button
+                    className="ar-btn-main ar-btn--icon"
+                    title="ここで決定（次へ）"
+                    aria-label="ここで決定（次へ）"
+                    disabled={!arLoc}
+                    onClick={confirmArLocate}
+                  >
+                    <IconChevron dir="right" size={18} />
+                  </button>
+                </div>
               )}
-              <div className="ar-dock-actions">
-                <button
-                  className="ar-btn-sub ar-btn--icon"
-                  title="撮影地点へ戻る"
-                  aria-label="撮影地点へ戻る"
-                  onClick={backToLocate}
-                >
-                  <IconChevron dir="left" size={18} />
-                </button>
-                <button
-                  className="ar-btn-main ar-btn--icon"
-                  title="山を選ぶ（次へ）"
-                  aria-label="山を選ぶ（次へ）"
-                  onClick={confirmArParams}
-                >
-                  <IconChevron dir="right" size={18} />
-                </button>
-              </div>
-            </>
-          )}
-
-          {arStep === "select" && (
-            <>
-              <div className="ar-hint">
-                <IconMountain size={15} />
-                <span>
-                  {appMode === "live" ? "見えている山を" : "写真に写る山を"}
-                  タップして選びます。地図は自由に移動・拡大できます（上の「
-                  {appMode === "live" ? "現在地" : "撮影地点"}に戻る」で復帰）
-                </span>
-              </div>
-              <div className="ar-dock-actions">
-                <button
-                  className="ar-btn-sub ar-btn--icon"
-                  title="向き・画角へ戻る"
-                  aria-label="向き・画角へ戻る"
-                  onClick={backToParams}
-                >
-                  <IconChevron dir="left" size={18} />
-                </button>
-                <span className="ar-select-count">選択 {peakSelCount} 山</span>
-                <button
-                  className="ar-btn-main ar-btn--icon"
-                  title={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
-                  aria-label={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
-                  onClick={goAlignFromSelect}
-                >
-                  <IconChevron dir="right" size={18} />
-                </button>
-              </div>
-            </>
-          )}
+              {arStep === "params" && (
+                <div className="ar-dock-actions">
+                  <button className="ar-btn-sub ar-btn--icon" title="撮影地点へ戻る" aria-label="撮影地点へ戻る" onClick={backToLocate}>
+                    <IconChevron dir="left" size={18} />
+                  </button>
+                  <button className="ar-btn-main ar-btn--icon" title="山を選ぶ（次へ）" aria-label="山を選ぶ（次へ）" onClick={confirmArParams}>
+                    <IconChevron dir="right" size={18} />
+                  </button>
+                </div>
+              )}
+              {arStep === "select" && (
+                <div className="ar-dock-actions">
+                  <button className="ar-btn-sub ar-btn--icon" title="向き・画角へ戻る" aria-label="向き・画角へ戻る" onClick={backToParams}>
+                    <IconChevron dir="left" size={18} />
+                  </button>
+                  <span className="ar-select-count">選択 {peakSelCount} 山</span>
+                  <button
+                    className="ar-btn-main ar-btn--icon"
+                    title={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
+                    aria-label={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
+                    onClick={goAlignFromSelect}
+                  >
+                    <IconChevron dir="right" size={18} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2560,12 +2535,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </div>
             {arPanelOpen && (
               <>
-                <div className="stage-controls">{stageZoomControls}</div>
-                <span className="cam-hint">
+                <div className="dock-hint">
                   {arLabels.length > 0
                     ? `名札や点をドラッグで位置を微調整／余白ドラッグで移動（${arLabels.length}件）`
                     : "写真の枠内に山がありません。微調整で向きを合わせ直してください"}
-                </span>
+                </div>
+                <div className="stage-controls">{stageZoomControls}</div>
                 <div className="ar-dock-actions">
                   <button
                     className="ar-btn-sub ar-btn--icon"
@@ -2652,7 +2627,22 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {arPanelOpen && (
           <>
+          {/* アナウンス（タイトル直下） */}
+          {simView ? (
+            <div className="dock-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
+          ) : arStep === "align" ? (
+            <div className="ar-hint">
+              <IconMountain size={15} />
+              <span>
+                {appMode === "live"
+                  ? "選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。"
+                  : "選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。"}
+              </span>
+            </div>
+          ) : null}
+          {/* 操作（3D/2D・地図/カメラ 等） */}
           {dockControls}
+          {/* 内容 */}
           {simView ? (
             <>
               {dockSection(
@@ -2663,7 +2653,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                   {eyeSlider}
                   {fovSlider}
                   {rollSlider}
-                  <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
                 </>,
               )}
               {showCelestial &&
@@ -2717,52 +2706,28 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                     )}
                 </>,
               )}
-              {appMode === "ar" && arStep === "align" && (
-                <div className="ar-phase-foot">
-                  <span className="cam-hint">
-                    選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。
-                  </span>
-                  <div className="ar-dock-actions">
-                    <button
-                      className="ar-btn-sub ar-btn--icon"
-                      title="山選択へ戻る"
-                      aria-label="山選択へ戻る"
-                      onClick={backToSelect}
-                    >
-                      <IconChevron dir="left" size={18} />
-                    </button>
-                    <button
-                      className="ar-btn-main ar-btn--icon"
-                      title="仕上げ（次へ）"
-                      aria-label="仕上げ（次へ）"
-                      onClick={goExport}
-                    >
-                      <IconChevron dir="right" size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {appMode === "live" && arStep === "align" && (
-                <div className="ar-phase-foot">
-                  <span className="cam-hint">
-                    選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。
-                  </span>
-                  <div className="ar-dock-actions">
-                    <button
-                      className="ar-btn-sub ar-btn--icon"
-                      title="山選択へ戻る"
-                      aria-label="山選択へ戻る"
-                      onClick={backToSelect}
-                    >
-                      <IconChevron dir="left" size={18} />
-                    </button>
-                    <button className="ar-btn-main" onClick={onHome}>
-                      完了
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
+          )}
+          {/* 進行ボタン（最下部） */}
+          {appMode === "ar" && arStep === "align" && (
+            <div className="ar-dock-actions">
+              <button className="ar-btn-sub ar-btn--icon" title="山選択へ戻る" aria-label="山選択へ戻る" onClick={backToSelect}>
+                <IconChevron dir="left" size={18} />
+              </button>
+              <button className="ar-btn-main ar-btn--icon" title="仕上げ（次へ）" aria-label="仕上げ（次へ）" onClick={goExport}>
+                <IconChevron dir="right" size={18} />
+              </button>
+            </div>
+          )}
+          {appMode === "live" && arStep === "align" && (
+            <div className="ar-dock-actions">
+              <button className="ar-btn-sub ar-btn--icon" title="山選択へ戻る" aria-label="山選択へ戻る" onClick={backToSelect}>
+                <IconChevron dir="left" size={18} />
+              </button>
+              <button className="ar-btn-main" onClick={onHome}>
+                完了
+              </button>
+            </div>
           )}
           </>
           )}
@@ -2788,6 +2753,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {modePanelOpen && (
             <div className="mode-dock-body">
+              <div className="dock-hint">{modeHint}</div>
               {dockControls}
               {dockSection("search", "検索", searchPanel)}
               {dockSection("basemap", "地図", basemapPanel)}

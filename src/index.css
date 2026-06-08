@@ -294,6 +294,12 @@ body,
   align-items: center;
   gap: 5px;
 }
+/* モードのアナウンス（タイトル直下の短い案内）。 */
+.dock-hint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #aebccf;
+}
 /* 折りたたみ用の見出しボタン（クリックで開閉）。 */
 .dock-section-head {
   display: flex;
