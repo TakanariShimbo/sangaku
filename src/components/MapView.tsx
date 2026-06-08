@@ -1914,6 +1914,195 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     </div>
   );
 
+  // 検索（モード選択＋入力＋結果）。各下部ドックで使い回す。
+  const searchPanel = (
+    <div className="dock-search">
+      <div className="search-modes">
+        {SEARCH_MODES.map((m) => (
+          <button key={m.id} className={m.id === searchMode ? "is-active" : ""} onClick={() => changeMode(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <form className="search-bar" onSubmit={doSearch}>
+        <input
+          type="search"
+          value={query}
+          placeholder={
+            searchMode === "mountain"
+              ? "山名で検索（例: 槍ヶ岳）"
+              : searchMode === "place"
+                ? "地名で検索（例: 上高地）"
+                : "山名・地名で検索（例: 富士山）"
+          }
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button type="submit" title="検索" aria-label="検索" disabled={searching}>
+          {searching ? (
+            <span className="spinner" aria-hidden="true" />
+          ) : (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <line x1="15.5" y1="15.5" x2="21" y2="21" />
+            </svg>
+          )}
+        </button>
+      </form>
+      {results.length > 0 && (
+        <ul className="search-results">
+          {results.map((r, i) => (
+            <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
+              <button onClick={() => goToResult(r)}>
+                <span className="res-ico">{r.kind === "mountain" ? <IconMountain size={15} /> : <IconPin size={15} />}</span>
+                <span className="res-title">{r.title}</span>
+                {r.kind === "mountain" && (
+                  <span className="res-sub">
+                    {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+  // ベースマップ切替（航空写真／標準／淡色／陰影）。
+  const basemapPanel = (
+    <div className="basemap-switch map-tools-basemap">
+      {BASEMAPS.map((b) => (
+        <button key={b.id} className={b.id === basemapId ? "is-active" : ""} onClick={() => setBasemapId(b.id)}>
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+  // 太陽・月の操作（日時＋スカイ情報）。
+  const celestialControls = (
+    <>
+      <div className="datetime-row">
+        <input type="date" className="dt-date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
+        <span className="dt-time">{hhmm}</span>
+        <button className="dt-now" onClick={setSunNow}>
+          現在
+        </button>
+      </div>
+      <input type="range" className="dt-slider" min={0} max={1439} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
+      {skyInfo && (
+        <div className="sky-card">
+          <div className="sky-row">
+            <IconSun size={22} className="sky-ico sky-ico--sun" />
+            <div className="sky-info">
+              <div className="sky-name">太陽</div>
+              <div className="sky-sub">
+                方位 {compass(skyInfo.sun.azimuthDeg)} {skyInfo.sun.azimuthDeg.toFixed(0)}° ・ 高度 {skyInfo.sun.altitudeDeg.toFixed(0)}°
+                {!skyInfo.sun.visible && " ・ 地平線下"}
+              </div>
+            </div>
+          </div>
+          <div className="sky-row">
+            <IconMoonPhase fraction={skyInfo.moonFraction} waxing={skyInfo.moonWaxing} size={24} />
+            <div className="sky-info">
+              <div className="sky-name">
+                {moonPhaseName(skyInfo.moonPhase)}
+                <span className="sky-pct">照度 {(skyInfo.moonFraction * 100).toFixed(0)}%</span>
+              </div>
+              <div className="sky-sub">
+                方位 {compass(skyInfo.moon.azimuthDeg)} {skyInfo.moon.azimuthDeg.toFixed(0)}° ・ 高度 {skyInfo.moon.altitudeDeg.toFixed(0)}°
+                {!skyInfo.moon.visible && " ・ 地平線下"}
+              </div>
+            </div>
+          </div>
+          <div className="moon-cycle">
+            {Array.from({ length: 8 }, (_, i) => {
+              const p = i / 8;
+              const now = Math.round(skyInfo.moonPhase * 8) % 8 === i;
+              return (
+                <div key={i} className={`moon-cyc${now ? " is-now" : ""}`} title={moonPhaseName(p)}>
+                  <IconMoonPhase fraction={(1 - Math.cos(2 * Math.PI * p)) / 2} waxing={p < 0.5} size={20} />
+                </div>
+              );
+            })}
+          </div>
+          <div className="sky-times">
+            日の出 {fmtTime(skyInfo.sunrise)} ・ 日の入 {fmtTime(skyInfo.sunset)}
+          </div>
+        </div>
+      )}
+    </>
+  );
+  // オフライン保存の操作。
+  const offlineControls = (
+    <>
+      <p className="save-note">
+        地図を動かして保存したい範囲を画面中央に合わせ、中心地点に設定してください。半径・詳細度ぶんを保存します。
+      </p>
+      <button className="save-btn" onClick={captureCenter} disabled={downloading}>
+        画面中央を中心地点にする
+      </button>
+      {center && (
+        <div className="save-center">
+          中心: {center.lat.toFixed(4)}°, {center.lon.toFixed(4)}°
+        </div>
+      )}
+      <label className="save-field">
+        <span>半径: {radiusKm} km</span>
+        <input type="range" min={RADIUS_MIN} max={RADIUS_MAX} value={radiusKm} disabled={downloading} onChange={(e) => setRadiusKm(Number(e.target.value))} />
+      </label>
+      <label className="save-field">
+        <span>
+          最大ズーム（詳細度）: z{maxZ}
+          {maxZ > 14 ? "（標高は z14 まで）" : ""}
+        </span>
+        <input type="range" min={PREFETCH_Z_MIN} max={PREFETCH_Z_MAX} value={maxZ} disabled={downloading} onChange={(e) => setMaxZ(Number(e.target.value))} />
+      </label>
+      {plan && (
+        <div className="save-plan">
+          {plan.jobs.length === 0 ? (
+            <span className="save-warn">この中心は日本の範囲外です。</span>
+          ) : (
+            <>
+              <div>
+                タイル数: <b>{plan.jobs.length.toLocaleString()}</b>（航空写真 {plan.aerialCount.toLocaleString()} ＋ 標高 {plan.demCount.toLocaleString()}）
+              </div>
+              <div>サイズ目安: 約 {formatBytes(plan.estBytes)}</div>
+              {plan.truncated && <div className="save-warn">範囲が広すぎるため上限で打ち切りました。半径を小さくしてください。</div>}
+            </>
+          )}
+        </div>
+      )}
+      {downloading && progress && (
+        <div className="save-progress">
+          <div className="save-bar">
+            <div className="save-bar-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="save-prog-text">
+            {progress.done.toLocaleString()} / {progress.total.toLocaleString()}（{pct}%）
+            {progress.failed > 0 && ` ／ 失敗 ${progress.failed}`}
+          </div>
+        </div>
+      )}
+      <div className="save-actions">
+        {downloading ? (
+          <button className="save-btn save-btn--danger" onClick={cancelDownload}>
+            中止
+          </button>
+        ) : (
+          <button className="save-btn save-btn--primary" onClick={startDownload} disabled={!plan || plan.jobs.length === 0}>
+            <IconDownload size={16} />
+            ダウンロード
+          </button>
+        )}
+      </div>
+      <div className="save-storage">
+        <span>保存済み: {storageUsage == null ? "—" : formatBytes(storageUsage)}</span>
+        <button className="save-link" onClick={clearCache} disabled={downloading}>
+          キャッシュを削除
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
@@ -2017,9 +2206,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                         : "現在地を取得しています…（地図をタップして指定もできます）")
                     : arLoc
                       ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
-                      : "撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索"}
+                      : "撮影地点を選んでください — 地図をタップ、または下の検索で指定"}
                 </span>
               </div>
+              {appMode !== "live" && searchPanel}
               <div className="ar-dock-actions">
                 {appMode === "live" ? (
                   <button className="ar-btn-sub" onClick={restartLive}>
@@ -2314,84 +2504,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       </div>
       {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
 
-      {/* 検索＋地図(ベースマップ)を画面上に常駐（地図が見えている時）。サイドバーは表示トグルのみ。 */}
-      {mode === "map" && !(arLike && arStep === "upload") && (
-        <div className="map-tools">
-          <div className="map-search">
-            <div className="search-modes">
-              {SEARCH_MODES.map((m) => (
-                <button
-                  key={m.id}
-                  className={m.id === searchMode ? "is-active" : ""}
-                  onClick={() => changeMode(m.id)}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <form className="search-bar" onSubmit={doSearch}>
-              <input
-                type="search"
-                value={query}
-                placeholder={
-                  searchMode === "mountain"
-                    ? "山名で検索（例: 槍ヶ岳）"
-                    : searchMode === "place"
-                      ? "地名で検索（例: 上高地）"
-                      : "山名・地名で検索（例: 富士山）"
-                }
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <button type="submit" title="検索" aria-label="検索" disabled={searching}>
-                {searching ? (
-                  <span className="spinner" aria-hidden="true" />
-                ) : (
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="18"
-                    height="18"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="10.5" cy="10.5" r="6.5" />
-                    <line x1="15.5" y1="15.5" x2="21" y2="21" />
-                  </svg>
-                )}
-              </button>
-            </form>
-            {results.length > 0 && (
-              <ul className="search-results">
-                {results.map((r, i) => (
-                  <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
-                    <button onClick={() => goToResult(r)}>
-                      <span className="res-ico">
-                        {r.kind === "mountain" ? <IconMountain size={15} /> : <IconPin size={15} />}
-                      </span>
-                      <span className="res-title">{r.title}</span>
-                      {r.kind === "mountain" && (
-                        <span className="res-sub">
-                          {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="basemap-switch map-tools-basemap">
-            {BASEMAPS.map((b) => (
-              <button key={b.id} className={b.id === basemapId ? "is-active" : ""} onClick={() => setBasemapId(b.id)}>
-                {b.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
       <button className="home-btn" title="ホーム画面へ戻る" aria-label="ホーム" onClick={onHome}>
         <IconHome size={18} />
@@ -2579,12 +2691,27 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
-      {/* 太陽・月モードの専用パネル（下） */}
-      {showCelestial && (
-        <div className="mode-panel">
-          <div className="mode-panel-grip">
+      {/* terrain/celestial/offline 共通の下部ドック（AR系と同じ：グリップで移動・折りたたみ）。1モード1パネル。 */}
+      {isSim && mode === "map" && (
+        <div
+          className="mode-dock"
+          style={{ transform: `translate(calc(-50% + ${arDockOffset.x}px), ${arDockOffset.y}px)` }}
+        >
+          <div className="cam-hud-grip ar-panel-grip" onPointerDown={onDockGripDown}>
             <span className="mode-panel-title">
-              <IconSun size={15} /> 太陽・月
+              {showCelestial ? (
+                <>
+                  <IconSun size={15} /> 太陽・月
+                </>
+              ) : isOffline ? (
+                <>
+                  <IconDownload size={15} /> オフライン保存
+                </>
+              ) : (
+                <>
+                  <IconMap size={15} /> 地図・検索
+                </>
+              )}
             </span>
             <button
               className="ar-panel-toggle"
@@ -2596,173 +2723,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </button>
           </div>
           {modePanelOpen && (
-            <div className="mode-panel-body">
-              <div className="datetime-row">
-                <input type="date" className="dt-date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
-                <span className="dt-time">{hhmm}</span>
-                <button className="dt-now" onClick={setSunNow}>
-                  現在
-                </button>
-              </div>
-              <input
-                type="range"
-                className="dt-slider"
-                min={0}
-                max={1439}
-                value={minutes}
-                onChange={(e) => setMinutes(Number(e.target.value))}
-              />
-              {skyInfo && (
-                <div className="sky-card">
-                  <div className="sky-row">
-                    <IconSun size={22} className="sky-ico sky-ico--sun" />
-                    <div className="sky-info">
-                      <div className="sky-name">太陽</div>
-                      <div className="sky-sub">
-                        方位 {compass(skyInfo.sun.azimuthDeg)} {skyInfo.sun.azimuthDeg.toFixed(0)}° ・ 高度{" "}
-                        {skyInfo.sun.altitudeDeg.toFixed(0)}°{!skyInfo.sun.visible && " ・ 地平線下"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="sky-row">
-                    <IconMoonPhase fraction={skyInfo.moonFraction} waxing={skyInfo.moonWaxing} size={24} />
-                    <div className="sky-info">
-                      <div className="sky-name">
-                        {moonPhaseName(skyInfo.moonPhase)}
-                        <span className="sky-pct">照度 {(skyInfo.moonFraction * 100).toFixed(0)}%</span>
-                      </div>
-                      <div className="sky-sub">
-                        方位 {compass(skyInfo.moon.azimuthDeg)} {skyInfo.moon.azimuthDeg.toFixed(0)}° ・ 高度{" "}
-                        {skyInfo.moon.altitudeDeg.toFixed(0)}°{!skyInfo.moon.visible && " ・ 地平線下"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="moon-cycle">
-                    {Array.from({ length: 8 }, (_, i) => {
-                      const p = i / 8;
-                      const now = Math.round(skyInfo.moonPhase * 8) % 8 === i;
-                      return (
-                        <div key={i} className={`moon-cyc${now ? " is-now" : ""}`} title={moonPhaseName(p)}>
-                          <IconMoonPhase fraction={(1 - Math.cos(2 * Math.PI * p)) / 2} waxing={p < 0.5} size={20} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="sky-times">
-                    日の出 {fmtTime(skyInfo.sunrise)} ・ 日の入 {fmtTime(skyInfo.sunset)}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* オフライン保存モードの専用パネル（下） */}
-      {isOffline && (
-        <div className="mode-panel">
-          <div className="mode-panel-grip">
-            <span className="mode-panel-title">
-              <IconDownload size={15} /> オフライン保存
-            </span>
-            <button
-              className="ar-panel-toggle"
-              title={modePanelOpen ? "畳む" : "開く"}
-              aria-label={modePanelOpen ? "畳む" : "開く"}
-              onClick={() => setModePanelOpen((o) => !o)}
-            >
-              <IconCaret dir={modePanelOpen ? "down" : "up"} size={16} />
-            </button>
-          </div>
-          {modePanelOpen && (
-            <div className="mode-panel-body">
-              <p className="save-note">
-                地図を動かして保存したい範囲を画面中央に合わせ、中心地点に設定してください。半径・詳細度ぶんを保存します。
-              </p>
-              <button className="save-btn" onClick={captureCenter} disabled={downloading}>
-                画面中央を中心地点にする
-              </button>
-              {center && (
-                <div className="save-center">
-                  中心: {center.lat.toFixed(4)}°, {center.lon.toFixed(4)}°
-                </div>
-              )}
-              <label className="save-field">
-                <span>半径: {radiusKm} km</span>
-                <input
-                  type="range"
-                  min={RADIUS_MIN}
-                  max={RADIUS_MAX}
-                  value={radiusKm}
-                  disabled={downloading}
-                  onChange={(e) => setRadiusKm(Number(e.target.value))}
-                />
-              </label>
-              <label className="save-field">
-                <span>
-                  最大ズーム（詳細度）: z{maxZ}
-                  {maxZ > 14 ? "（標高は z14 まで）" : ""}
-                </span>
-                <input
-                  type="range"
-                  min={PREFETCH_Z_MIN}
-                  max={PREFETCH_Z_MAX}
-                  value={maxZ}
-                  disabled={downloading}
-                  onChange={(e) => setMaxZ(Number(e.target.value))}
-                />
-              </label>
-              {plan && (
-                <div className="save-plan">
-                  {plan.jobs.length === 0 ? (
-                    <span className="save-warn">この中心は日本の範囲外です。</span>
-                  ) : (
-                    <>
-                      <div>
-                        タイル数: <b>{plan.jobs.length.toLocaleString()}</b>（航空写真 {plan.aerialCount.toLocaleString()} ＋
-                        標高 {plan.demCount.toLocaleString()}）
-                      </div>
-                      <div>サイズ目安: 約 {formatBytes(plan.estBytes)}</div>
-                      {plan.truncated && (
-                        <div className="save-warn">範囲が広すぎるため上限で打ち切りました。半径を小さくしてください。</div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              {downloading && progress && (
-                <div className="save-progress">
-                  <div className="save-bar">
-                    <div className="save-bar-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="save-prog-text">
-                    {progress.done.toLocaleString()} / {progress.total.toLocaleString()}（{pct}%）
-                    {progress.failed > 0 && ` ／ 失敗 ${progress.failed}`}
-                  </div>
-                </div>
-              )}
-              <div className="save-actions">
-                {downloading ? (
-                  <button className="save-btn save-btn--danger" onClick={cancelDownload}>
-                    中止
-                  </button>
-                ) : (
-                  <button
-                    className="save-btn save-btn--primary"
-                    onClick={startDownload}
-                    disabled={!plan || plan.jobs.length === 0}
-                  >
-                    <IconDownload size={16} />
-                    ダウンロード
-                  </button>
-                )}
-              </div>
-              <div className="save-storage">
-                <span>保存済み: {storageUsage == null ? "—" : formatBytes(storageUsage)}</span>
-                <button className="save-link" onClick={clearCache} disabled={downloading}>
-                  キャッシュを削除
-                </button>
-              </div>
+            <div className="mode-dock-body">
+              {searchPanel}
+              {basemapPanel}
+              {showCelestial && celestialControls}
+              {isOffline && offlineControls}
             </div>
           )}
         </div>
