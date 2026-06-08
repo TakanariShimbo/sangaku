@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { QuadtreeTerrain } from "../terrain/QuadtreeTerrain";
@@ -228,6 +228,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const arPhotoAspectRef = useRef<number | null>(null); // 撮影写真の縦横比(W/H)。3D枠の整形に使う
   const arPhotoElRef = useRef<HTMLImageElement | null>(null); // 写真オーバーレイのDOM（枠に追従）
   const arHudRef = useRef<HTMLDivElement | null>(null); // カメラHUD（下部パネル）。枠の予約高さ算出に使う
+  // 写真枠が予約するパネル高さ。フェーズ開始時・画面リサイズ時にだけ更新し、
+  // セクションの折りたたみ/パネル移動では更新しない（写真がそれに追従しないように）。
+  const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
   const arDragRef = useRef<{ i: number; kind: "dot" | "label" } | null>(null); // ドラッグ中の対象
@@ -461,7 +464,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         w = h * aspect;
       }
       const gap = 8;
-      const panelTop = H - ((arHudRef.current?.offsetHeight ?? 150) + 24 + gap);
+      const panelTop = H - (arPanelReserveRef.current + 24 + gap);
       let y = (H - h) / 2;
       if (y + h > panelTop) y = Math.max(0, panelTop - h);
       return { x: (W - w) / 2, y, w, h };
@@ -1127,6 +1130,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
+      // 画面サイズが変わった時だけパネル予約高さを測り直す（折りたたみでは更新しない）。
+      if (arHudRef.current) arPanelReserveRef.current = arHudRef.current.offsetHeight;
     };
     window.addEventListener("resize", onResize);
     const ro = new ResizeObserver(onResize);
@@ -1170,6 +1175,18 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   useEffect(() => {
     if (isOffline) navigator.storage?.estimate?.().then((e) => setStorageUsage(e.usage ?? 0));
   }, [isOffline]);
+
+  // 微調整(④)・書き出し(⑤)に入った時に写真枠が予約するパネル高さを確定する。
+  // 以後はセクションの折りたたみやパネル移動では測り直さないので、写真がそれに追従しない。
+  useLayoutEffect(() => {
+    if (arStep !== "align" && arStep !== "export") return;
+    const measure = () => {
+      if (arHudRef.current) arPanelReserveRef.current = arHudRef.current.offsetHeight;
+    };
+    measure();
+    const id = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(id);
+  }, [arStep]);
 
   // ベースマップ切替を地形へ反映する。
   useEffect(() => {
