@@ -268,3 +268,23 @@ export function IconEye({ size = 16, className }: Props) {
     </svg>
   );
 }
+
+/** 虫めがね（検索）。検索セクションの見出し用。 */
+export function IconSearch({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <line x1="15.5" y1="15.5" x2="21" y2="21" />
+    </svg>
+  );
+}
+
+/** コンパス（向き・画角）。円＋方位ポインタ。向き・画角セクションの見出し用。 */
+export function IconCompass({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5 L10.5 10.5 L8.5 15.5 L13.5 13.5 Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

@@ -27,6 +27,8 @@ import {
   IconAll,
   IconPlus,
   IconMinus,
+  IconSearch,
+  IconCompass,
 } from "./icons";
 import {
   worldToLonLat,
@@ -2377,12 +2379,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               {/* 操作（現在地・3D/2D・撮影地点へ） */}
               {dockControls}
               {/* 内容 */}
-              {arStep === "locate" && appMode !== "live" && dockSection("arsearch", "検索", searchPanel)}
-              {arStep === "select" && dockSection("arsearch", "検索", searchPanel)}
+              {arStep === "locate" && appMode !== "live" && dockSection("arsearch", <><IconSearch size={13} /> 検索</>, searchPanel)}
+              {arStep === "select" && dockSection("arsearch", <><IconSearch size={13} /> 検索</>, searchPanel)}
               {arStep === "params" &&
                 dockSection(
                   "arparams",
-                  "向き・画角",
+                  <>
+                    <IconCompass size={13} /> 向き・画角
+                  </>,
                   <>
                     <div className="cam-readout">
                       <div className="cam-stat">
@@ -2652,7 +2656,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             <>
               {dockSection(
                 "camcfg",
-                "カメラ設定",
+                <>
+                  <IconCamera size={13} /> カメラ設定
+                </>,
                 <>
                   {cameraReadout}
                   {eyeSlider}
@@ -2679,7 +2685,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               )}
               {dockSection(
                 "aradjust",
-                "カメラ設定",
+                <>
+                  <IconCamera size={13} /> カメラ設定
+                </>,
                 <>
                   {cameraReadout}
                   {eyeSlider}
@@ -2761,8 +2769,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             <div className="mode-dock-body">
               <div className="dock-hint">{modeHint}</div>
               {dockControls}
-              {dockSection("search", "検索", searchPanel)}
-              {dockSection("basemap", "地図", basemapPanel)}
+              {dockSection("search", <><IconSearch size={13} /> 検索</>, searchPanel)}
+              {dockSection("basemap", <><IconMap size={13} /> 地図</>, basemapPanel)}
               {showCelestial &&
                 dockSection(
                   "celest",
@@ -2771,7 +2779,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                   </>,
                   celestialControls,
                 )}
-              {isOffline && dockSection("save", "オフライン保存", offlineControls)}
+              {isOffline && dockSection("save", <><IconDownload size={13} /> オフライン保存</>, offlineControls)}
             </div>
           )}
         </div>

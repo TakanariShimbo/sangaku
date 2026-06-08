@@ -214,11 +214,13 @@ body,
   z-index: 20; /* 写真オーバーレイ(z4)より前面に */
 }
 /* ドック内の操作行（地図/カメラ・2D/3D は選択ボタン、現在地等はアイコン）。 */
+/* アナウンス直下の操作ボタン行。アナウンスの中身としてセクション内容と同じ字下げにする。 */
 .dock-viewbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding-left: 18px;
 }
 /* セグメント選択（航空写真スイッチと同系統。現在値を明示）。 */
 .seg {
@@ -300,12 +302,11 @@ body,
 }
 /* モードのアナウンス（タイトル直下の短い案内）。 */
 .dock-hint {
-  padding: 9px 0;
+  padding-top: 9px;
   font-size: 11.5px;
   line-height: 1.45;
   color: #aebccf;
   border-top: 1px solid rgba(130, 150, 175, 0.16);
-  border-bottom: 1px solid rgba(130, 150, 175, 0.16);
 }
 /* 折りたたみ用の見出しボタン（クリックで開閉）。左の開閉キャレットで「押せる行」だと明示。 */
 .dock-section-head {
@@ -1291,12 +1292,11 @@ body,
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 9px 0;
+  padding-top: 9px;
   font-size: 12px;
   line-height: 1.45;
   color: #eaf2fb;
   border-top: 1px solid rgba(130, 150, 175, 0.16);
-  border-bottom: 1px solid rgba(130, 150, 175, 0.16);
 }
 .ar-hint > svg {
   flex: none;
