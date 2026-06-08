@@ -205,6 +205,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // ライブAR（カメラ）は写真取込が無いので地点(locate)から開始。
   const [arStep, setArStep] = useState<ArStep>(appMode === "live" ? "locate" : "upload");
   const [arLoc, setArLoc] = useState<{ lat: number; lon: number } | null>(null); // 撮影地点
+  const [arPhotoLoc, setArPhotoLoc] = useState<{ lat: number; lon: number } | null>(null); // 写真EXIFのGPS位置（あれば「写真の位置に戻す」用）
   const [arHeadingDeg, setArHeadingDeg] = useState<number | null>(null); // 撮影方位（EXIF or ②で設定）
   const [arFovDeg, setArFovDeg] = useState(CAM_FOV_DEFAULT); // 横画角（EXIF or ②で設定）
   // 出力(仕上げ)で編集する各山ラベル。座標は写真フレーム内の正規化値(0..1)。
@@ -1517,8 +1518,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArFovDeg(fov);
     if (exif.lat != null && exif.lon != null) {
       // EXIFに位置があってもスキップせず、推定地点へピンを置いて確認・微調整できるようにする。
+      setArPhotoLoc({ lat: exif.lat, lon: exif.lon }); // 後で「写真の位置に戻す」で復帰できるよう保持
       placeArPoint(exif.lat, exif.lon);
       apiRef.current?.flyTo({ lat: exif.lat, lon: exif.lon });
+    } else {
+      setArPhotoLoc(null); // 位置情報なしの写真
     }
     setArStep("locate"); // 位置の確認/指定フェーズへ（EXIFありは確認、なしは指定）
   };
@@ -1559,19 +1563,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     apiRef.current?.setControlMode("map");
     setArStep("params");
   };
-  // 最初からやり直す（写真を外して写真選択フェーズへ）。
-  const restartAr = () => {
-    if (mode === "camera") exitCameraMode();
-    apiRef.current?.setControlMode("map"); // 向き決め/山選択のロックを解除
-    if (photoUrl) URL.revokeObjectURL(photoUrl);
-    setPhotoUrl(null);
-    setArLoc(null);
-    arPinXZRef.current = null;
-    setArHeadingDeg(null);
-    setArFovDeg(CAM_FOV_DEFAULT);
-    changeCamRoll(0); // 傾き補正をリセット
-    setArLabels([]);
-    setArStep("upload");
+  // 撮影地点を写真のGPS位置に戻す（手動でずらした地点を、写真EXIFの位置へ復帰）。
+  const resetToPhotoLoc = () => {
+    if (!arPhotoLoc) return;
+    placeArPoint(arPhotoLoc.lat, arPhotoLoc.lon);
+    apiRef.current?.flyTo({ lat: arPhotoLoc.lat, lon: arPhotoLoc.lon });
   };
   // 撮影地点に戻る（自由に見て回った後、フェーズ1で決めた地点へ視点を戻す）。
   const recenterAr = () => {
@@ -2019,9 +2015,20 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </span>
               </div>
               <div className="ar-dock-actions">
-                <button className="ar-btn-sub" onClick={appMode === "live" ? restartLive : restartAr}>
-                  {appMode === "live" ? "現在地を取り直す" : "やり直す"}
-                </button>
+                {appMode === "live" ? (
+                  <button className="ar-btn-sub" onClick={restartLive}>
+                    現在地を取り直す
+                  </button>
+                ) : (
+                  <button
+                    className="ar-btn-sub"
+                    onClick={resetToPhotoLoc}
+                    disabled={!arPhotoLoc}
+                    title={arPhotoLoc ? "写真の位置情報(GPS)に撮影地点を戻す" : "この写真に位置情報がありません"}
+                  >
+                    写真の位置に戻す
+                  </button>
+                )}
                 <button
                   className="ar-btn-main ar-btn--icon"
                   title="ここで決定（次へ）"
