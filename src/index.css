@@ -1776,11 +1776,32 @@ body,
 .ar-edit-stage.is-image-mode .ar-caption {
   pointer-events: none;
 }
-/* 解説の幅スライダー */
-.ar-w-slider {
-  flex: 1;
-  max-width: 62%;
-  accent-color: #4f86c6;
+.ar-edit-stage.is-image-mode .ar-cap-handle {
+  display: none;
+}
+/* 解説ブロックのリサイズハンドル（パワポ図形風）。右=横幅、下=縦に伸ばす。 */
+.ar-cap-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border: 2px solid #4f86c6;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  z-index: 2;
+}
+.ar-cap-handle--x {
+  right: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+.ar-cap-handle--y {
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: ns-resize;
 }
 .ar-cap-cols {
   display: flex;

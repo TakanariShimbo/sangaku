@@ -239,8 +239,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const bakeCaption = captionLang !== "none"; // 解説を焼き込むか
   // 仕上げ(⑤)の操作モード: image=写真をパン/ズーム / edit=ラベル・解説を移動。誤操作を防ぐ。
   const [arExportMode, setArExportMode] = useState<"image" | "edit">("edit");
-  // 解説ブロックの幅（写真幅に対する割合）。スライダーでアスペクト比を調整。
+  // 解説ブロックの幅（写真幅に対する割合）。端のハンドルを引いてアスペクト比を調整（文字サイズは固定）。
   const [captionW, setCaptionW] = useState(0.55);
+  const capResizeRef = useRef<{ axis: "x" | "y"; startW: number; startU: number; startV: number } | null>(null);
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 解説・ラベル共通の文字サイズ倍率（小0.8 / 中1.0 / 大1.25）。
@@ -263,7 +264,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" | "capResize" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -1861,6 +1862,22 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     }
     arDragRef.current = { i: -1, kind: "caption" };
   };
+  // 解説ブロックのリサイズ（端のハンドル）。x=横ハンドル(右へ=幅広→行数減)、y=縦ハンドル(下へ=幅狭→行数増)。
+  const onCapResizeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture?.(e.pointerId);
+    const axis: "x" | "y" = el.classList.contains("ar-cap-handle--y") ? "y" : "x";
+    const r = arEditStageRef.current?.getBoundingClientRect();
+    capResizeRef.current = {
+      axis,
+      startW: captionW,
+      startU: r ? (e.clientX - r.left) / r.width : 0,
+      startV: r ? (e.clientY - r.top) / r.height : 0,
+    };
+    arDragRef.current = { i: -1, kind: "capResize" };
+  };
   // 仕上げ画面: 写真の余白部分をドラッグ＝写真+3Dビューをパン（「画像」モードのみ）。
   const onStagePanDown = (e: React.PointerEvent) => {
     if (arExportMode !== "image") return; // 編集モードでは写真は固定（ラベル・解説の操作優先）
@@ -1901,6 +1918,15 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         u: Math.min(maxU, Math.max(0, u - off.offU)),
         v: Math.min(0.82, Math.max(0, v - off.offV)),
       });
+      return;
+    }
+    if (d.kind === "capResize") {
+      const rz = capResizeRef.current;
+      if (!rz) return;
+      // x: 右へ引く=幅広（行数減）。y: 下へ引く=幅狭（行数増）。文字サイズは変えない。
+      const next = rz.axis === "x" ? rz.startW + (u - rz.startU) : rz.startW - (v - rz.startV) * 1.4;
+      const maxW = Math.max(0.25, 1 - captionPos.u); // フレーム右端を超えない
+      setCaptionW(Math.min(maxW, Math.max(0.25, next)));
       return;
     }
     setArLabels((prev) =>
@@ -2763,6 +2789,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       ? "Auto-generated from facts (ref: Wikipedia et al.)"
                       : "解説は事実をもとに自動生成（参考: Wikipedia ほか）"}
                   </div>
+                  {/* リサイズハンドル（右＝横幅 / 下＝縦に伸ばすと幅が狭まる）。文字サイズは固定。 */}
+                  <span
+                    className="ar-cap-handle ar-cap-handle--x"
+                    title="幅を変える"
+                    onPointerDown={onCapResizeDown}
+                    onPointerMove={onEditMove}
+                    onPointerUp={onEditUp}
+                  />
+                  <span
+                    className="ar-cap-handle ar-cap-handle--y"
+                    title="縦に伸ばす（幅が狭まる）"
+                    onPointerDown={onCapResizeDown}
+                    onPointerMove={onEditMove}
+                    onPointerUp={onEditUp}
+                  />
                 </div>
               )}
           </div>
@@ -2842,19 +2883,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               ) : null,
                             )}
                           </div>
-                        )}
-                        {bakeCaption && (
-                          <label className="ar-fs-row">
-                            <span>解説の幅</span>
-                            <input
-                              type="range"
-                              className="ar-w-slider"
-                              min={30}
-                              max={98}
-                              value={Math.round(captionW * 100)}
-                              onChange={(e) => setCaptionW(Number(e.target.value) / 100)}
-                            />
-                          </label>
                         )}
                       </>
                     )}
