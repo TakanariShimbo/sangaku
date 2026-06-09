@@ -62,6 +62,7 @@ import {
   type LonLat,
   type PrefetchProgress,
 } from "../lib/prefetch";
+import type { Settings } from "../settings";
 
 // 3Dビュー本体。Three.js のセットアップ、地図的なカメラ操作（MapControls＋画面ボタン）、
 // 毎フレームのクアッドツリー更新、そして事前ロード（中心＋半径でオフライン保存）UI を持つ。
@@ -86,9 +87,6 @@ const CAM_FOV_MIN = 5; // 横画角の下限（望遠写真にも合わせられ
 const CAM_FOV_MAX = 110;
 const CAM_PITCH_LIMIT = 80;
 const CAM_EYE_DEFAULT = 1.6; // 目線高さ(m, 地表から)
-const VEX_MAP_DEFAULT = 1.7; // 地図モードの標高誇張
-const VEX_CAM_DEFAULT = 1.0; // カメラ視点モードの標高誇張（実寸）
-const PEAKS_DEFAULT_ON = true; // 山頂マーカー・山名ラベルを既定で表示するか
 const CAM_CELESTIAL_R = 5000; // カメラ視点で太陽月を置く半径(ワールド≒遠方の空)
 
 // Date → <input type="date"> 用のローカル日付文字列 (YYYY-MM-DD)。
@@ -108,6 +106,7 @@ type MapViewProps = {
   // terrain=地形 / celestial=太陽月 / ar=写真AR / live=カメラAR / offline=オフライン保存。
   appMode: "terrain" | "celestial" | "ar" | "live" | "offline";
   onHome: () => void; // ホーム画面へ戻る。
+  settings: Settings; // 表示設定（ホームで変更）。マウント時の初期値として取り込む。
 };
 
 // ARウィザードのフェーズ。
@@ -123,7 +122,7 @@ type ArLabel = {
   labelV: number;
 };
 
-export default function MapView({ appMode, onHome }: MapViewProps) {
+export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
   const arLike = appMode === "ar" || appMode === "live";
   const isSim = appMode === "terrain" || appMode === "celestial" || appMode === "offline"; // 3D地形ビュー系
@@ -177,27 +176,26 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [searching, setSearching] = useState(false);
   const [locating, setLocating] = useState(false); // 現在地取得中
   const [locError, setLocError] = useState<string | null>(null);
-  // サイドバー開閉。
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   // 地図(俯瞰)の2D/3D。2D=真上固定の地図、3D=傾けられる地形。カメラ視点には影響しない。
   // AR/ライブは向き決め・山選択を真上から行いたいので既定2D。シミュレーションは3D。
   const [map2D, setMap2D] = useState(arLike); // AR/ライブは2D既定、地形系は3D既定
   const map2DRef = useRef(arLike);
+  // 表示設定はホームの「表示設定」パネルで変更し、ここではマウント時の初期値として取り込む。
   // 中心マーカー（視点中心＝画面中央の目印）。画面中央のレティクルで表示する。
-  const [showCenter, setShowCenter] = useState(true);
+  const [showCenter] = useState(settings.showCenter);
   // 空グラデーション表示。
-  const [showSky, setShowSky] = useState(true);
-  const showSkyRef = useRef(true);
-  // 山頂マーカー表示（既定オン。初回有効化時に山岳データを遅延ロード）。
-  const [showPeaks, setShowPeaks] = useState(PEAKS_DEFAULT_ON);
+  const [showSky] = useState(settings.showSky);
+  const showSkyRef = useRef(settings.showSky);
+  // 山頂マーカー表示（オン時は初回マウントで山岳データを遅延ロード）。
+  const [showPeaks] = useState(settings.showPeaks);
   const peaksLoadedRef = useRef(false);
   // 選択中（色＋名前表示）の山の数。0より大きいとき画面に一括解除チップを出す。
   const [peakSelCount, setPeakSelCount] = useState(0);
   // 視点フリーモード（解像度・太陽月・円盤を凍結して視点だけ動かす）。
   const [freeLook, setFreeLook] = useState(false);
   // 標高の誇張（×1=実寸 1:1:1）。モードごとに既定が異なる（地図1.7 / カメラ1.0）。
-  const [mapVex, setMapVex] = useState(VEX_MAP_DEFAULT);
-  const [camVex, setCamVex] = useState(VEX_CAM_DEFAULT);
+  const [mapVex] = useState(settings.mapVex);
+  const [camVex] = useState(settings.camVex);
 
   // --- カメラ視点モード（3Dマップを一人称カメラとして使う） --- //
   const [mode, setMode] = useState<"map" | "camera">("map");
@@ -261,14 +259,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [liveStatus, setLiveStatus] = useState<string | null>(null); // GPS/センサ/カメラの状態メッセージ
   // 方位センサ追従のON/OFF。ONで②の向きがコンパスに追従、OFFで固定（手動で微調整可）。
   const [liveFollow, setLiveFollow] = useState(true);
-  // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
-  const [openSec, setOpenSec] = useState<Record<string, boolean>>({
-    search: true,
-    map: true,
-    view: false,
-  });
-  const toggleSec = (id: string) => setOpenSec((s) => ({ ...s, [id]: !s[id] }));
-  const secClass = (id: string) => `side-sec${openSec[id] ? "" : " is-collapsed"}`;
 
   // --- 太陽・月 --- //
   // 太陽月は celestial モードで常時ON（トグル廃止＝モードで決まる）。
@@ -347,6 +337,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     sun.position.set(0.6, 1, 0.4).normalize().multiplyScalar(1000);
     scene.add(sun);
 
+    // 標高の誇張はモジュール全体で共有する値。初期表示（地図モード）の設定値を反映してから地形を作る。
+    applyVEX(mapVex);
     const terrain = new QuadtreeTerrain(renderer);
     scene.add(terrain.group);
 
@@ -796,8 +788,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       },
     };
 
-    // 既定で山頂表示ON。初回マウント時に山岳データを遅延ロードして点・ラベルを出す。
-    if (PEAKS_DEFAULT_ON) {
+    // 設定で山頂表示ONなら、初回マウント時に山岳データを遅延ロードして点・ラベルを出す。
+    if (showPeaks) {
       peaksLoadedRef.current = true;
       apiRef.current.setPeaksVisible(true);
       loadAllMountains().then((data) => apiRef.current?.setPeaksData(data));
@@ -1175,6 +1167,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       renderer.forceContextLoss();
       mount.removeChild(renderer.domElement);
     };
+    // mapVex/showPeaks はマウント時の初期値のみ使う（モード中は変化しない）。意図的に空依存。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 保存範囲のプレビュー円: オフライン保存モードで中心を設定している間だけ表示。
@@ -1376,7 +1370,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     if (arStep === "locate") placeArPoint(r.lat, r.lon); // AR地点選択中なら検索先を撮影地点に
     setResults([]);
     setQuery(r.title);
-    setSidebarOpen(false); // 飛んだ先の地図が見えるよう閉じる
   };
 
   // --- 現在地へ移動（GPS） --- //
@@ -1393,7 +1386,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         homeLocRef.current = loc;
         apiRef.current?.flyTo(loc);
-        setSidebarOpen(false);
       },
       (err) => {
         setLocating(false);
@@ -1791,13 +1783,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const onEditUp = () => {
     arDragRef.current = null;
   };
-  // 現在のモードの標高誇張を変更（モードごとに記憶）。
-  const activeVex = mode === "camera" ? camVex : mapVex;
-  const changeVex = (v: number) => {
-    if (mode === "camera") setCamVex(v);
-    else setMapVex(v);
-    apiRef.current?.setVerticalExaggeration(v);
-  };
   const changeCamEyeHeight = (m: number) => {
     setCamEyeHeight(m);
     apiRef.current?.setCamEyeHeight(m);
@@ -1827,29 +1812,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     if (phase < 0.78) return "下弦の月";
     return "有明月";
   };
-  // スイッチ行（表示セクション用）。
-  const switchRow = (label: string, checked: boolean, onChange: (b: boolean) => void) => (
-    <label className="switch-row">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        className="switch"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-    </label>
-  );
-
-  // 山頂マーカーの表示切替。初回 ON で山岳データを遅延ロードして流し込む。
-  const togglePeaks = (on: boolean) => {
-    setShowPeaks(on);
-    if (on && !peaksLoadedRef.current) {
-      peaksLoadedRef.current = true;
-      loadAllMountains().then((data) => apiRef.current?.setPeaksData(data));
-    }
-    apiRef.current?.setPeaksVisible(on);
-  };
-
   // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
 
   // --- 太陽・月操作 --- //
@@ -1861,13 +1823,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const fmtTime = (d: Date | null) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : "—");
   const hhmm = `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
-
-  const secHead = (id: string, title: string) => (
-    <button className="side-sec-head" onClick={() => toggleSec(id)} aria-expanded={openSec[id]}>
-      <span>{title}</span>
-      <span className={`side-chev${openSec[id] ? " is-open" : ""}`} />
-    </button>
-  );
 
   const SEARCH_MODES: { id: SearchMode; label: string }[] = [
     { id: "mountain", label: "山名" },
@@ -2677,12 +2632,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </svg>
       )}
 
-      {/* 上部はメニュー(☰)のみ。他の操作（現在地/カメラ/2D3D/自由視点/撮影地点に戻る）は各ドック内へ。 */}
-      <div className="topbar">
-        <button className="topbar-btn" title="メニュー" aria-label="メニュー" onClick={() => setSidebarOpen((o) => !o)}>
-          ☰
-        </button>
-      </div>
+      {/* 表示設定はホーム画面の「表示設定」パネルへ移設（旧☰メニューは廃止）。 */}
       {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
 
       {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
@@ -2886,50 +2836,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           )}
         </div>
       )}
-
-      {/* サイドバー背景（タップで閉じる） */}
-      {sidebarOpen && <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
-
-      {/* サイドバー：検索・地図・表示・事前保存 */}
-      <aside className={`sidebar${sidebarOpen ? " is-open" : ""}`}>
-        <div className="sidebar-head">
-          <span>Sangaku</span>
-          <button className="sidebar-close" title="閉じる" onClick={() => setSidebarOpen(false)}>×</button>
-        </div>
-
-        {/* 表示 */}
-        <section className={secClass("view")}>
-          {secHead("view", "表示")}
-          {switchRow("中心マーカー", showCenter, setShowCenter)}
-          <label className="switch-row">
-            <span>山頂マーカー</span>
-            <input
-              type="checkbox"
-              className="switch"
-              checked={showPeaks}
-              onChange={(e) => togglePeaks(e.target.checked)}
-            />
-          </label>
-          {switchRow("空のグラデーション", showSky, setShowSky)}
-          <label className="slider-row">
-            <span className="slider-label">
-              標高の誇張（{mode === "camera" ? "風景" : "地図"}）
-              <b>×{activeVex.toFixed(1)}</b>
-              {activeVex === 1 ? " 実寸" : ""}
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.1}
-              value={activeVex}
-              onChange={(e) => changeVex(Number(e.target.value))}
-            />
-          </label>
-        </section>
-
-      </aside>
-
 
       <div className="attribution">
         出典:{" "}
