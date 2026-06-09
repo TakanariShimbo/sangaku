@@ -30,6 +30,7 @@ import {
   IconSearch,
   IconCompass,
   IconInfo,
+  IconLandscape,
 } from "./icons";
 import {
   worldToLonLat,
@@ -1951,10 +1952,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </button>
           <button
             className={mode === "camera" ? "is-active" : ""}
-            title="カメラ視点（立って見回す）"
+            title="風景（その場に立って見回す）"
             onClick={() => mode === "map" && enterCameraMode()}
           >
-            <IconCamera size={14} /> カメラ
+            <IconLandscape size={14} /> 風景
           </button>
         </div>
       )}
@@ -2217,10 +2218,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   );
   // モードのアナウンス（タイトル直下に出す短い案内）。
   const modeHint = showCelestial
-    ? "地図で地点を合わせ、下の「太陽・月」で日時を変えると、その地点の太陽・月の方位・高度がわかります。「カメラ」で立てば空の位置で確認できます。"
+    ? "地図で地点を合わせ、下の「太陽・月」で日時を変えると、その地点の太陽・月の方位・高度がわかります。「風景」で立てば空の位置で確認できます。"
     : isOffline
       ? "保存したい範囲を画面中央に合わせ、「画面中央を中心地点にする」で中心を決めます。半径・詳細度を選び「ダウンロード」で保存します。"
-      : "地図をドラッグ／検索で移動します。「カメラ」で立つと一人称で見回せます。";
+      : "地図をドラッグ／検索で移動します。「風景」で立つと一人称で見回せます。";
   // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
   const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
     const open = dockSecOpen[id] ?? true;
@@ -2837,7 +2838,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {switchRow("空のグラデーション", showSky, setShowSky)}
           <label className="slider-row">
             <span className="slider-label">
-              標高の誇張（{mode === "camera" ? "カメラ" : "地図"}）
+              標高の誇張（{mode === "camera" ? "風景" : "地図"}）
               <b>×{activeVex.toFixed(1)}</b>
               {activeVex === 1 ? " 実寸" : ""}
             </span>

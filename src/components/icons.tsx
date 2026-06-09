@@ -199,6 +199,16 @@ export function IconMap({ size = 16, className }: Props) {
   );
 }
 
+/** 風景（山並み＋太陽）。地図(俯瞰)の対になる「その場に立った眺め」ビュー用。 */
+export function IconLandscape({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="16.5" cy="7.5" r="2.5" />
+      <path d="M2 19 L8 10.5 L12.5 16 L16 11.5 L22 19" />
+    </svg>
+  );
+}
+
 /** 現在地（GPSロケート）。十字＋中心の的。 */
 export function IconLocate({ size = 16, className }: Props) {
   return (
