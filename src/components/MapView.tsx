@@ -234,6 +234,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [captionIdx, setCaptionIdx] = useState(0);
   // 解説キャプションを写真に焼き込むか（既定ON）。解説のある山が無ければ無効。
   const [bakeCaption, setBakeCaption] = useState(true);
+  // 山名ラベルを写真に焼き込むか（既定ON）。
+  const [bakeLabels, setBakeLabels] = useState(true);
+  // 解説・ラベル共通の文字サイズ倍率（小0.8 / 中1.0 / 大1.25）。
+  const [arFontScale, setArFontScale] = useState(1);
+  // 解説ブロックの配置（写真フレーム内の正規化座標。ブロック左上）。ドラッグで移動。
+  const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
+  const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
   const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
   const arLocRef = useRef<{ lat: number; lon: number } | null>(null); // 撮影地点（2D/3D切替の中心に使う）
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
@@ -249,7 +256,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -1690,10 +1697,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, W, H);
-    const fs = Math.max(13, Math.round(H * 0.024)); // 写真サイズに応じた文字サイズ
-    ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+    const fs = Math.round(Math.max(13, H * 0.024) * arFontScale); // 文字サイズ（解説・ラベル共通の倍率）
     ctx.textBaseline = "alphabetic";
-    for (const lb of arLabels) {
+    if (bakeLabels) {
+      ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+      for (const lb of arLabels) {
       const dotX = lb.dotU * W;
       const dotY = lb.dotV * H;
       const text = `${lb.name} ${Math.round(lb.elevM)}m`;
@@ -1728,20 +1736,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
       ctx.fillText(text, cx, cy + fs * 0.34);
+      }
     }
 
-    // 下部キャプション（スクショ風の解説帯）。山名＋標高＋解説＋出典(Wikipedia)を左下に焼く。
+    // 解説ブロック（可動カード）。captionPos の位置に、山名＋標高＋解説＋出典を角丸カードで焼く。
     const cap = arLabels[captionIdx];
     if (bakeCaption && cap?.description) {
-      const m = Math.round(W * 0.045); // 左右余白
-      const titleFs = Math.max(15, Math.round(H * 0.03));
-      const bodyFs = Math.max(12, Math.round(H * 0.022));
-      const srcFs = Math.max(10, Math.round(H * 0.015));
+      const boxW = Math.round(W * 0.62); // ブロック幅
+      const pad = Math.round(boxW * 0.05);
+      const titleFs = Math.round(Math.max(15, H * 0.028) * arFontScale);
+      const bodyFs = Math.round(Math.max(12, H * 0.021) * arFontScale);
+      const srcFs = Math.round(Math.max(10, H * 0.014) * arFontScale);
       const titleLineH = Math.round(titleFs * 1.35);
-      const lineH = Math.round(bodyFs * 1.5);
+      const lineH = Math.round(bodyFs * 1.55);
       const srcLineH = Math.round(srcFs * 1.9);
-      const pv = Math.round(bodyFs * 0.9); // 上下パディング
-      const textW = W - m * 2;
+      const textW = boxW - pad * 2;
       // 本文を文字単位で折り返し（日本語は単語境界が無いため）
       ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
       ctx.textAlign = "left";
@@ -1753,26 +1762,26 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         else cur += ch;
       }
       if (cur) lines.push(cur);
-      const bandH = pv * 2 + titleLineH + lines.length * lineH + srcLineH;
-      const bandTop = H - bandH;
-      // 背景グラデ（下ほど濃く＝文字が読める）
-      const grad = ctx.createLinearGradient(0, bandTop, 0, H);
-      grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(0.3, "rgba(0,0,0,0.5)");
-      grad.addColorStop(1, "rgba(0,0,0,0.8)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, bandTop, W, bandH);
-      let top = bandTop + pv;
+      const boxH = pad * 2 + titleLineH + lines.length * lineH + srcLineH;
+      // captionPos（左上）を画像内に収める
+      const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - boxW));
+      const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - boxH));
+      // 角丸の半透明カード
+      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+      ctx.beginPath();
+      ctx.roundRect(bx, by, boxW, boxH, Math.round(bodyFs * 0.7));
+      ctx.fill();
+      let top = by + pad;
       ctx.fillStyle = "#fff";
       ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText(`${cap.name}  ${Math.round(cap.elevM)}m`, m, top + titleFs);
+      ctx.fillText(`${cap.name}  ${Math.round(cap.elevM)}m`, bx + pad, top + titleFs);
       top += titleLineH;
       ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
       ctx.fillStyle = "rgba(255,255,255,0.94)";
-      for (const ln of lines) { ctx.fillText(ln, m, top + bodyFs); top += lineH; }
+      for (const ln of lines) { ctx.fillText(ln, bx + pad, top + bodyFs); top += lineH; }
       ctx.fillStyle = "rgba(255,255,255,0.62)";
       ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText("解説は事実をもとに自動生成（参考: Wikipedia ほか）", m, top + srcFs);
+      ctx.fillText("解説は事実をもとに自動生成（参考: Wikipedia ほか）", bx + pad, top + srcFs);
     }
     return canvas.toDataURL("image/jpeg", 0.92);
   };
@@ -1822,6 +1831,20 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     arDragRef.current = { i, kind };
   };
+  // 解説ブロックのドラッグ開始（ラベル同様、掴んだ位置とブロック左上のズレを記録）。
+  const onCaptionDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    const stage = arEditStageRef.current;
+    if (stage) {
+      const r = stage.getBoundingClientRect();
+      const pu = (e.clientX - r.left) / r.width;
+      const pv = (e.clientY - r.top) / r.height;
+      captionDragRef.current = { offU: pu - captionPos.u, offV: pv - captionPos.v };
+    }
+    arDragRef.current = { i: -1, kind: "caption" };
+  };
   // 仕上げ画面: 写真の余白部分をドラッグ＝写真+3Dビューをパン（名札以外の場所）。
   const onStagePanDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest(".ar-edit-label, .ar-edit-dot")) return;
@@ -1852,6 +1875,15 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const r = stage.getBoundingClientRect();
     const u = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const v = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    if (d.kind === "caption") {
+      const off = captionDragRef.current ?? { offU: 0, offV: 0 };
+      // ブロック幅62%・高さ余裕ぶん、フレーム内に収める（焼き込みのクランプと一致）。
+      setCaptionPos({
+        u: Math.min(0.38, Math.max(0, u - off.offU)),
+        v: Math.min(0.82, Math.max(0, v - off.offV)),
+      });
+      return;
+    }
     setArLabels((prev) =>
       prev.map((lb, idx) =>
         idx !== d.i ? lb : d.kind === "dot" ? { ...lb, dotU: u, dotV: v } : { ...lb, labelU: u, labelV: v },
@@ -2613,46 +2645,57 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ref={arEditStageRef}
             onPointerDown={onStagePanDown}
             onWheel={onStageWheel}
+            style={{ "--ar-fs": arFontScale } as React.CSSProperties}
           >
             {photoUrl && <img className="ar-edit-photo" src={photoUrl} alt="" draggable={false} />}
-            {/* 引き出し線（名札→点） */}
-            <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {arLabels.map((lb, i) => (
-                <line
-                  key={i}
-                  x1={lb.labelU * 100}
-                  y1={lb.labelV * 100}
-                  x2={lb.dotU * 100}
-                  y2={lb.dotV * 100}
-                  stroke="rgba(255,255,255,0.85)"
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </svg>
-            {arLabels.map((lb, i) => (
-              <div key={i}>
-                <div
-                  className="ar-edit-dot"
-                  style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
-                  onPointerDown={onEditDown(i, "dot")}
-                  onPointerMove={onEditMove}
-                  onPointerUp={onEditUp}
-                />
-                <div
-                  className="ar-edit-label"
-                  style={{ left: `${lb.labelU * 100}%`, top: `${lb.labelV * 100}%` }}
-                  onPointerDown={onEditDown(i, "label")}
-                  onPointerMove={onEditMove}
-                  onPointerUp={onEditUp}
-                >
-                  {lb.name} {Math.round(lb.elevM)}m
-                </div>
-              </div>
-            ))}
-            {/* 下部キャプション（スクショ風の解説帯）。焼き込みONのときだけ写真に乗る位置を示す。 */}
+            {/* 山名ラベル（表示ONのときだけ。引き出し線＋点＋名札） */}
+            {bakeLabels && (
+              <>
+                <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {arLabels.map((lb, i) => (
+                    <line
+                      key={i}
+                      x1={lb.labelU * 100}
+                      y1={lb.labelV * 100}
+                      x2={lb.dotU * 100}
+                      y2={lb.dotV * 100}
+                      stroke="rgba(255,255,255,0.85)"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                </svg>
+                {arLabels.map((lb, i) => (
+                  <div key={i}>
+                    <div
+                      className="ar-edit-dot"
+                      style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
+                      onPointerDown={onEditDown(i, "dot")}
+                      onPointerMove={onEditMove}
+                      onPointerUp={onEditUp}
+                    />
+                    <div
+                      className="ar-edit-label"
+                      style={{ left: `${lb.labelU * 100}%`, top: `${lb.labelV * 100}%` }}
+                      onPointerDown={onEditDown(i, "label")}
+                      onPointerMove={onEditMove}
+                      onPointerUp={onEditUp}
+                    >
+                      {lb.name} {Math.round(lb.elevM)}m
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {/* 解説ブロック（可動カード）。ドラッグで写真内の好きな位置へ。焼き込み結果のプレビュー。 */}
             {bakeCaption && arLabels[captionIdx]?.description && (
-              <div className="ar-caption" aria-hidden="true">
+              <div
+                className="ar-caption"
+                style={{ left: `${captionPos.u * 100}%`, top: `${captionPos.v * 100}%` }}
+                onPointerDown={onCaptionDown}
+                onPointerMove={onEditMove}
+                onPointerUp={onEditUp}
+              >
                 <div className="ar-caption-title">
                   {arLabels[captionIdx].name}
                   <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
@@ -2685,37 +2728,61 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               <>
                 {announce(
                   arLabels.length > 0
-                    ? `名札や点をドラッグで微調整します。余白のドラッグで全体を移動できます（${arLabels.length}件）。`
+                    ? `名札や点・解説ブロックはドラッグで配置できます。下の設定で表示や文字サイズを切り替えられます（${arLabels.length}件）。`
                     : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
                 )}
                 <div className="stage-controls">{stageZoomControls}</div>
-                {/* 解説キャプション（Wikipedia）の焼き込み設定。解説のある山が選ばれている時だけ出す。 */}
-                {arLabels.some((l) => l.description) && (
+                {/* 焼き込み設定: 山名ラベル・解説の表示、解説の取り上げ山、共通の文字サイズ。 */}
+                {arLabels.length > 0 && (
                   <div className="ar-caption-ctrl">
                     <label className="switch-row">
-                      <span>写真に解説を入れる</span>
+                      <span>写真に山名を入れる</span>
                       <input
                         type="checkbox"
                         className="switch"
-                        checked={bakeCaption}
-                        onChange={(e) => setBakeCaption(e.target.checked)}
+                        checked={bakeLabels}
+                        onChange={(e) => setBakeLabels(e.target.checked)}
                       />
                     </label>
-                    {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
-                      <div className="ar-caption-pick">
-                        {arLabels.map((l, i) =>
-                          l.description ? (
-                            <button
-                              key={i}
-                              className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
-                              onClick={() => setCaptionIdx(i)}
-                            >
-                              {l.name}
-                            </button>
-                          ) : null,
+                    {arLabels.some((l) => l.description) && (
+                      <>
+                        <label className="switch-row">
+                          <span>写真に解説を入れる</span>
+                          <input
+                            type="checkbox"
+                            className="switch"
+                            checked={bakeCaption}
+                            onChange={(e) => setBakeCaption(e.target.checked)}
+                          />
+                        </label>
+                        {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
+                          <div className="ar-caption-pick">
+                            {arLabels.map((l, i) =>
+                              l.description ? (
+                                <button
+                                  key={i}
+                                  className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
+                                  onClick={() => setCaptionIdx(i)}
+                                >
+                                  {l.name}
+                                </button>
+                              ) : null,
+                            )}
+                          </div>
                         )}
-                      </div>
+                      </>
                     )}
+                    {/* 文字サイズ（解説・ラベル共通） */}
+                    <div className="ar-fs-row">
+                      <span>文字サイズ</span>
+                      <div className="seg" role="group" aria-label="文字サイズ">
+                        {([["小", 0.8], ["中", 1], ["大", 1.25]] as [string, number][]).map(([lab, v]) => (
+                          <button key={lab} className={arFontScale === v ? "is-active" : ""} onClick={() => setArFontScale(v)}>
+                            {lab}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
                 <div className="ar-dock-actions">
