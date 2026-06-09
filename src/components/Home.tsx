@@ -7,31 +7,31 @@ type Props = { onSelect: (mode: AppMode) => void };
 const CARDS: { mode: AppMode; icon: React.ReactNode; title: string; desc: string }[] = [
   {
     mode: "terrain",
-    icon: <IconMountain size={30} />,
+    icon: <IconMountain size={26} />,
     title: "地形を見る",
     desc: "日本の地形を3Dで俯瞰。好きな地点に立って自由に見回せます",
   },
   {
     mode: "celestial",
-    icon: <IconSun size={30} />,
+    icon: <IconSun size={26} />,
     title: "太陽・月の動きを見る",
     desc: "日時を変えて、その地点から見た太陽・月の方位／高度や日の出・日の入りを確かめます",
   },
   {
     mode: "ar",
-    icon: <IconImage size={30} />,
+    icon: <IconImage size={26} />,
     title: "写真に山名をのせる",
     desc: "撮った山の写真に山名を重ね、合成画像を書き出せます（AR）",
   },
   {
     mode: "live",
-    icon: <IconCamera size={30} />,
+    icon: <IconCamera size={26} />,
     title: "カメラで山名を見る",
     desc: "今いる場所からカメラ越しに、見えている山へ名前を重ねます（GPS・方位）",
   },
   {
     mode: "offline",
-    icon: <IconDownload size={30} />,
+    icon: <IconDownload size={26} />,
     title: "オフライン保存",
     desc: "見たい範囲をあらかじめ保存。通信がなくてもその範囲を3D表示できます",
   },
@@ -49,8 +49,10 @@ export default function Home({ onSelect }: Props) {
           {CARDS.map((c) => (
             <button key={c.mode} className="home-card" onClick={() => onSelect(c.mode)}>
               <span className="home-card-icon">{c.icon}</span>
-              <span className="home-card-title">{c.title}</span>
-              <span className="home-card-desc">{c.desc}</span>
+              <span className="home-card-text">
+                <span className="home-card-title">{c.title}</span>
+                <span className="home-card-desc">{c.desc}</span>
+              </span>
             </button>
           ))}
         </div>
