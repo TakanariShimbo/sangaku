@@ -1772,7 +1772,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       for (const ln of lines) { ctx.fillText(ln, m, top + bodyFs); top += lineH; }
       ctx.fillStyle = "rgba(255,255,255,0.62)";
       ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText("出典: Wikipedia（CC BY-SA）", m, top + srcFs);
+      ctx.fillText("解説は事実をもとに自動生成（参考: Wikipedia ほか）", m, top + srcFs);
     }
     return canvas.toDataURL("image/jpeg", 0.92);
   };
@@ -2658,7 +2658,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
                 </div>
                 <p className="ar-caption-text">{shortDesc(arLabels[captionIdx].description)}</p>
-                <div className="ar-caption-src">出典: Wikipedia（CC BY-SA）</div>
+                <div className="ar-caption-src">解説は事実をもとに自動生成（参考: Wikipedia ほか）</div>
               </div>
             )}
           </div>
