@@ -1723,25 +1723,19 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const sub = `${lb.nameEn ? lb.nameEn + " | " : ""}${Math.round(lb.elevM).toLocaleString()}m`;
         const subBaseline = cy;
         const nameBaseline = cy - Math.round(subFs * 1.35);
-        // リード線（ラベル下 → 点）。細い縦線。
-        ctx.strokeStyle = "rgba(255,255,255,0.9)";
-        ctx.lineWidth = Math.max(1, L * 0.0024);
+        // リード線（ラベル下 → 山頂）。文字色に合わせる。点(頂点)は出力しない。
+        ctx.strokeStyle = labelColor;
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = Math.max(1, L * 0.0022);
         ctx.beginPath();
         ctx.moveTo(cx, cy + Math.round(subFs * 0.3));
         ctx.lineTo(dotX, dotY);
         ctx.stroke();
-        // 点（白丸・小さめ）
-        ctx.beginPath();
-        ctx.arc(dotX, dotY, Math.max(2.5, L * 0.007), 0, Math.PI * 2);
-        ctx.fillStyle = "#fff";
-        ctx.fill();
-        ctx.lineWidth = Math.max(1, L * 0.0014);
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.stroke();
-        // 文字（背景なし・中央揃え・影は文字色の反対色で可読性確保）
+        ctx.globalAlpha = 1;
+        // 文字（背景なし・中央揃え・影は文字色の反対色で可読性確保。黒文字の白影は控えめ）
         ctx.save();
-        ctx.shadowColor = labelColor === "#000000" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.85)";
-        ctx.shadowBlur = Math.round(L * 0.005);
+        ctx.shadowColor = labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)";
+        ctx.shadowBlur = Math.round(L * 0.0035);
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
         ctx.textAlign = "center";
         ctx.fillStyle = labelColor;
@@ -1793,10 +1787,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const blockH = titleLineH + maxLines * lineH + Math.round(srcFs * 2);
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
         const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
-        // 影で可読性を確保（背景ボックスなし）。影は文字色の反対色。
+        // 影で可読性を確保（背景ボックスなし）。影は文字色の反対色（黒文字の白影は控えめ）。
         ctx.save();
-        ctx.shadowColor = captionColor === "#000000" ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.9)";
-        ctx.shadowBlur = Math.round(L * 0.006);
+        ctx.shadowColor = captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)";
+        ctx.shadowBlur = Math.round(L * 0.004);
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
         wrapped.forEach((w, ci) => {
           const cx = bx + (ci === 0 ? 0 : colWidths[0] + colGap);
@@ -2776,8 +2770,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       y1={lb.labelV * 100}
                       x2={lb.dotU * 100}
                       y2={lb.dotV * 100}
-                      stroke="rgba(255,255,255,0.85)"
-                      strokeWidth={1.5}
+                      stroke={labelColor}
+                      strokeOpacity={0.9}
+                      strokeWidth={1.2}
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
@@ -2798,7 +2793,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                           left: `${lb.labelU * 100}%`,
                           top: `${lb.labelV * 100}%`,
                           color: labelColor,
-                          "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.9)",
+                          "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)",
                         } as React.CSSProperties
                       }
                       onPointerDown={onEditDown(i, "label")}
@@ -2827,7 +2822,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       top: `${captionPos.v * 100}%`,
                       width: `${captionW * 100}%`,
                       color: captionColor,
-                      "--cap-sh": captionColor === "#000000" ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.92)",
+                      "--cap-sh": captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)",
                     } as React.CSSProperties
                   }
                   onPointerDown={onCaptionDown}
