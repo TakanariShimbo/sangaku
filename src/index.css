@@ -1722,11 +1722,16 @@ body,
   inset: 0;
   opacity: 0.6;
   pointer-events: none;
+  z-index: 2; /* 名札本体より上＝引き出し線の起点ハンドルを掴めるように（点だけ pointer-events 有効） */
+}
+/* 引き出し線の起点ハンドル（白リングで山頂点と区別）。 */
+.ar-edit-anchor::before {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
 }
 .ar-edit-dot {
   position: absolute;
-  width: 20px; /* つかみやすいよう当たり判定は広め（見た目は中の青丸のみ） */
-  height: 20px;
+  width: 30px; /* つかみやすいよう当たり判定は広め（見た目は中の青丸のみ） */
+  height: 30px;
   transform: translate(-50%, -50%);
   background: transparent;
   cursor: grab;
@@ -1736,7 +1741,7 @@ body,
 .ar-edit-dot::before {
   content: "";
   position: absolute;
-  inset: 6.5px; /* 解説ハンドルと同じ青ドット・小さめ。色は不透明、透過は親layerでまとめて掛ける */
+  inset: 11.5px; /* 解説ハンドルと同じ青ドット・小さめ。色は不透明、透過は親layerでまとめて掛ける */
   border-radius: 50%;
   background: rgb(143, 194, 255);
 }
@@ -1832,12 +1837,21 @@ body,
 /* 4辺のリサイズハンドル（枠線と同色の半透明ドット・小さめ）。 */
 .ar-cap-handle {
   position: absolute;
+  width: 26px; /* 当たり判定は広め（見た目の青丸は ::before で小さく保つ） */
+  height: 26px;
+  background: transparent;
+  touch-action: none;
+  z-index: 3;
+}
+.ar-cap-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
   width: clamp(7px, 1.5cqmax, 11px);
   height: clamp(7px, 1.5cqmax, 11px);
   background: rgba(143, 194, 255, 0.6);
   border-radius: 50%;
-  touch-action: none;
-  z-index: 3;
 }
 .ar-cap-handle--l {
   left: -1cqmax;
@@ -1904,6 +1918,16 @@ body,
   height: clamp(7px, 1.5cqmax, 11px);
   background: rgba(143, 194, 255, 0.6);
   border-radius: 50%;
+}
+/* 当たり判定を横に広げる（見た目は変えない）。 */
+.ar-cap-divider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
 }
 .ar-caption-title {
   font-family: var(--cap-title-ff, inherit);

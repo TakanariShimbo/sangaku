@@ -126,6 +126,7 @@ type ArLabel = {
   descriptionEn?: string; // 解説（英語・長め）。
   descriptionEnShort?: string; // 解説（英語・短め）。
   nameEn?: string; // 英名（例: Mt. Fuji）。
+  labelAnchor?: "top" | "bottom" | "left" | "right"; // 引き出し線がラベルのどの辺から出るか（既定=下）。
   prefecture?: string; // 所在県（例: 山梨県/静岡県）。タグ「場所」に使う。
   tagsJa?: string[]; // タグ（日本語）。
   tagsEn?: string[]; // タグ（英語）。tagsJa と同じ並び。
@@ -407,6 +408,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     }
   };
   const labelHasSub = labelMode !== "jaOnly" && labelMode !== "enOnly";
+  // ラベルの実寸（正規化）。引き出し線をラベルの上下左右どの辺から出すか計算するのに使う。
+  const [labelBoxes, setLabelBoxes] = useState<Record<number, { w: number; h: number }>>({});
+  // 引き出し線がラベルの選んだ辺の中点から出る座標（正規化）。
+  const labelSidePoint = (i: number) => {
+    const lb = arLabels[i];
+    const box = labelBoxes[i] ?? { w: 0, h: 0 };
+    const anchor = lb?.labelAnchor ?? "bottom";
+    if (anchor === "top") return { x: lb.labelU, y: lb.labelV - box.h };
+    if (anchor === "left") return { x: lb.labelU - box.w / 2, y: lb.labelV - box.h / 2 };
+    if (anchor === "right") return { x: lb.labelU + box.w / 2, y: lb.labelV - box.h / 2 };
+    return { x: lb.labelU, y: lb.labelV }; // bottom（下端中央）
+  };
   // 文字サイズ倍率（スライダーで連続調整）。役割ごとに独立。初期値はすべて 1.0。
   //  labelNameScale    … ラベル1段目（山名）のサイズ。0.7〜2.0
   //  labelSubScale     … ラベル2段目（Mt.ローマ字｜標高）のサイズ。0.7〜1.6
@@ -460,7 +473,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" | "capResize" | "capSplit" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -1924,9 +1937,22 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const subBaseline = cy;
         // 補足があれば1段目はその上、無ければ1段目を下端（cy）に置く。
         const nameBaseline = sub ? cy - Math.round(subFs * 1.35) : cy;
-        // リード線（ラベル下 → 山頂）。文字色に合わせる。点(頂点)は出力しない。
-        // 両端は描かず、点と点の中心66%だけ実線（17%ずつ余白）。
-        const ax = cx, ay = cy + Math.round(subFs * 0.3);
+        // リード線（ラベルの選んだ辺 → 山頂）。文字色に合わせる。点(頂点)は出力しない。
+        // ラベルの実寸（テキスト幅・高さ）から上下左右の辺の中点を求める。
+        ctx.font = `700 ${nameFs}px ${ffName}`;
+        const nameW = ctx.measureText(name).width;
+        let subW = 0;
+        if (sub) {
+          ctx.font = `500 ${subFs}px ${ffSub}`;
+          subW = ctx.measureText(sub).width;
+        }
+        const boxW = Math.max(nameW, subW);
+        const boxTop = nameBaseline - nameFs;
+        const boxBottom = (sub ? subBaseline : nameBaseline) + Math.round((sub ? subFs : nameFs) * 0.25);
+        const boxMidY = (boxTop + boxBottom) / 2;
+        const anchor = lb.labelAnchor ?? "bottom";
+        const ax = anchor === "left" ? cx - boxW / 2 : anchor === "right" ? cx + boxW / 2 : cx;
+        const ay = anchor === "top" ? boxTop : anchor === "bottom" ? boxBottom : boxMidY;
         const bx = dotX, by = dotY;
         ctx.strokeStyle = labelColor;
         ctx.globalAlpha = 0.9;
@@ -2245,7 +2271,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     a.click();
   };
   // 仕上げ画面: 名札/点のドラッグ。座標は写真枠内の正規化値(0..1)で持つ。
-  const onEditDown = (i: number, kind: "dot" | "label") => (e: React.PointerEvent) => {
+  const onEditDown = (i: number, kind: "dot" | "label" | "labelAnchor") => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation(); // 名札/点のドラッグは写真パンを開始させない
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -2364,6 +2390,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       setCaptionSplit(Math.min(0.8, Math.max(0.2, (u - captionPos.u) / Math.max(0.001, captionW))));
       return;
     }
+    if (d.kind === "labelAnchor") {
+      // 引き出し線の起点（ラベルの辺）を切り替える。指の位置がラベル中心から見て近い辺にスナップ。
+      const lb = arLabels[d.i];
+      const box = labelBoxes[d.i] ?? { w: 0, h: 0 };
+      const cxn = lb.labelU;
+      const cyn = lb.labelV - box.h / 2; // ラベル中心
+      const dx = (u - cxn) / Math.max(1e-4, box.w / 2);
+      const dy = (v - cyn) / Math.max(1e-4, box.h / 2);
+      const side = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? "left" : "right") : dy < 0 ? "top" : "bottom";
+      setArLabels((prev) => prev.map((l, idx) => (idx !== d.i ? l : { ...l, labelAnchor: side })));
+      return;
+    }
     setArLabels((prev) =>
       prev.map((lb, idx) =>
         idx !== d.i ? lb : d.kind === "dot" ? { ...lb, dotU: u, dotV: v } : { ...lb, labelU: u, labelV: v },
@@ -2373,6 +2411,28 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const onEditUp = () => {
     arDragRef.current = null;
   };
+  // ラベル実寸を測って正規化で保持（引き出し線の辺アンカー計算に使う）。
+  // 位置(labelU/V)ドラッグでは寸法は変わらないので、変化時のみ state を更新。
+  useLayoutEffect(() => {
+    const stage = arEditStageRef.current;
+    if (!stage) return;
+    const r = stage.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const next: Record<number, { w: number; h: number }> = {};
+    stage.querySelectorAll<HTMLElement>(".ar-edit-label").forEach((el) => {
+      const idx = Number(el.dataset.idx);
+      if (Number.isNaN(idx)) return;
+      const b = el.getBoundingClientRect();
+      next[idx] = { w: b.width / r.width, h: b.height / r.height };
+    });
+    setLabelBoxes((prev) => {
+      const ks = Object.keys(next);
+      const same =
+        ks.length === Object.keys(prev).length &&
+        ks.every((k) => prev[+k] && Math.abs(prev[+k].w - next[+k].w) < 1e-4 && Math.abs(prev[+k].h - next[+k].h) < 1e-4);
+      return same ? prev : next;
+    });
+  }, [arLabels, labelMode, labelNameScale, labelSubScale, roleFonts, bakeLabels, arStep, arExportMode]);
   const changeCamEyeHeight = (m: number) => {
     setCamEyeHeight(m);
     apiRef.current?.setCamEyeHeight(m);
@@ -3166,7 +3226,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 {/* 出力されるリード線（文字色・中心66%だけ実線、両端17%は余白）。焼き込みのプレビュー。 */}
                 <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {arLabels.map((lb, i) => {
-                    const ax = lb.labelU * 100, ay = lb.labelV * 100;
+                    const sp = labelSidePoint(i);
+                    const ax = sp.x * 100, ay = sp.y * 100;
                     const bx = lb.dotU * 100, by = lb.dotV * 100;
                     return (
                       <line
@@ -3187,39 +3248,45 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     同じ層内で重なっても合成は1回きりなので色が濃くならない。出力には焼き込まない。 */}
                 <div className="ar-edit-chrome">
                   <svg className="ar-edit-guides" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    {arLabels.map((lb, i) => (
-                      <line
-                        key={i}
-                        x1={lb.labelU * 100}
-                        y1={lb.labelV * 100}
-                        x2={lb.dotU * 100}
-                        y2={lb.dotV * 100}
-                        stroke="rgb(143,194,255)"
-                        strokeWidth={1.2}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ))}
+                    {arLabels.map((lb, i) => {
+                      const sp = labelSidePoint(i);
+                      return (
+                        <line
+                          key={i}
+                          x1={sp.x * 100}
+                          y1={sp.y * 100}
+                          x2={lb.dotU * 100}
+                          y2={lb.dotV * 100}
+                          stroke="rgb(143,194,255)"
+                          strokeWidth={1.2}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
                   </svg>
-                  {arLabels.map((lb, i) => (
-                    <div key={i}>
-                      {/* 山頂側のアンカー点 */}
-                      <div
-                        className="ar-edit-dot"
-                        style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
-                        onPointerDown={onEditDown(i, "dot")}
-                        onPointerMove={onEditMove}
-                        onPointerUp={onEditUp}
-                      />
-                      {/* ラベル側のアンカー点（ドラッグでラベル移動） */}
-                      <div
-                        className="ar-edit-dot"
-                        style={{ left: `${lb.labelU * 100}%`, top: `${lb.labelV * 100}%` }}
-                        onPointerDown={onEditDown(i, "label")}
-                        onPointerMove={onEditMove}
-                        onPointerUp={onEditUp}
-                      />
-                    </div>
-                  ))}
+                  {arLabels.map((lb, i) => {
+                    const sp = labelSidePoint(i);
+                    return (
+                      <div key={i}>
+                        {/* 山頂側のアンカー点（ドラッグで山頂位置を調整） */}
+                        <div
+                          className="ar-edit-dot"
+                          style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
+                          onPointerDown={onEditDown(i, "dot")}
+                          onPointerMove={onEditMove}
+                          onPointerUp={onEditUp}
+                        />
+                        {/* 引き出し線の起点（ドラッグで上下左右の辺に付け替え）。ラベル移動は名札本体をドラッグ。 */}
+                        <div
+                          className="ar-edit-dot ar-edit-anchor"
+                          style={{ left: `${sp.x * 100}%`, top: `${sp.y * 100}%` }}
+                          onPointerDown={onEditDown(i, "labelAnchor")}
+                          onPointerMove={onEditMove}
+                          onPointerUp={onEditUp}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 {/* ラベル本体（文字・全不透明）。内容は labelMode に従う。 */}
                 {arLabels.map((lb, i) => {
@@ -3228,6 +3295,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     <div
                       key={i}
                       className="ar-edit-label"
+                      data-idx={i}
                       style={
                         {
                           left: `${lb.labelU * 100}%`,
