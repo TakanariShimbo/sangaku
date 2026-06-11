@@ -126,8 +126,27 @@ type ArLabel = {
   descriptionEn?: string; // 解説（英語・長め）。
   descriptionEnShort?: string; // 解説（英語・短め）。
   nameEn?: string; // 英名（例: Mt. Fuji）。
+  prefecture?: string; // 所在県（例: 山梨県/静岡県）。タグ「場所」に使う。
+  tagsJa?: string[]; // タグ（日本語）。
+  tagsEn?: string[]; // タグ（英語）。tagsJa と同じ並び。
   source?: string; // 参考URL
 };
+
+// 県名→英語（タグ「場所」の英語表示用）。「県/府/都」を除いたヘボン式。北海道は Hokkaido。
+const PREF_EN: Record<string, string> = {
+  北海道: "Hokkaido", 青森県: "Aomori", 岩手県: "Iwate", 宮城県: "Miyagi", 秋田県: "Akita",
+  山形県: "Yamagata", 福島県: "Fukushima", 茨城県: "Ibaraki", 栃木県: "Tochigi", 群馬県: "Gunma",
+  埼玉県: "Saitama", 千葉県: "Chiba", 東京都: "Tokyo", 神奈川県: "Kanagawa", 新潟県: "Niigata",
+  富山県: "Toyama", 石川県: "Ishikawa", 福井県: "Fukui", 山梨県: "Yamanashi", 長野県: "Nagano",
+  岐阜県: "Gifu", 静岡県: "Shizuoka", 愛知県: "Aichi", 三重県: "Mie", 滋賀県: "Shiga",
+  京都府: "Kyoto", 大阪府: "Osaka", 兵庫県: "Hyogo", 奈良県: "Nara", 和歌山県: "Wakayama",
+  鳥取県: "Tottori", 島根県: "Shimane", 岡山県: "Okayama", 広島県: "Hiroshima", 山口県: "Yamaguchi",
+  徳島県: "Tokushima", 香川県: "Kagawa", 愛媛県: "Ehime", 高知県: "Kochi", 福岡県: "Fukuoka",
+  佐賀県: "Saga", 長崎県: "Nagasaki", 熊本県: "Kumamoto", 大分県: "Oita", 宮崎県: "Miyazaki",
+  鹿児島県: "Kagoshima", 沖縄県: "Okinawa",
+};
+const prefEn = (pref: string) =>
+  pref.split("/").map((p) => PREF_EN[p.trim()] ?? p.trim().replace(/[県府都道]$/, "")).join(" / ");
 
 // ラベルの内容パターン（1段目=主名／2段目=補足の組み合わせ）。
 type LabelMode = "jaSubEnElev" | "jaSubEn" | "jaSubElev" | "enSubElev" | "jaOnly" | "enOnly";
@@ -303,6 +322,25 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     captionLength === "short" ? lb.descriptionShort || lb.description : lb.description;
   const descEn = (lb: { descriptionEn?: string; descriptionEnShort?: string }) =>
     captionLength === "short" ? lb.descriptionEnShort || lb.descriptionEn : lb.descriptionEn;
+  // 山名と本文の間に差し込むタグ。高さ・場所・タグリストから任意に選ぶ（既定OFF）。
+  const [capShowElev, setCapShowElev] = useState(false);
+  const [capShowLoc, setCapShowLoc] = useState(false);
+  const [capSelectedTags, setCapSelectedTags] = useState<string[]>([]); // 選択中の日本語タグ
+  const toggleCapTag = (t: string) =>
+    setCapSelectedTags((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
+  // 指定言語のチップ文字列を組み立てる（高さ→場所→選択タグの順）。
+  const capChips = (lb: ArLabel, lang: "ja" | "en"): string[] => {
+    const chips: string[] = [];
+    if (capShowElev) chips.push(`${Math.round(lb.elevM).toLocaleString()}m`);
+    if (capShowLoc && lb.prefecture)
+      chips.push(lang === "en" ? prefEn(lb.prefecture) : lb.prefecture.replace(/\//g, "・"));
+    const tj = lb.tagsJa ?? [];
+    const te = lb.tagsEn ?? [];
+    tj.forEach((t, i) => {
+      if (capSelectedTags.includes(t)) chips.push(lang === "en" ? te[i] ?? t : t);
+    });
+    return chips;
+  };
   // 解説プレビュー用の派生値（両方表示時の見出し構成）。焼き込み側のロジックと一致させる。
   const capItem = arLabels[captionIdx];
   const capBoth = captionLang === "both" && !!capItem?.description && !!capItem?.descriptionEn;
@@ -310,6 +348,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const capNameEn = capItem?.nameEn || capItem?.name || "";
   // 各本文に自前の見出しを付けるか（本文ごと、または単一言語のとき）。
   const capColHasTitle = !capBoth || captionTitleMode === "each";
+  // タグ言語: 英語本文のときだけ英語、両方・日本語は日本語。
+  const capTagLang: "ja" | "en" = captionLang === "en" ? "en" : "ja";
+  // タグ（ピル）プレビュー。指定言語のチップを並べる。空なら null。
+  const capTagEls = (lang: "ja" | "en") => {
+    if (!capItem) return null;
+    const chips = capChips(capItem, lang);
+    if (!chips.length) return null;
+    return (
+      <div className="ar-cap-tags">
+        {chips.map((c, i) => (
+          <span key={i} className="ar-cap-tag">{c}</span>
+        ))}
+      </div>
+    );
+  };
   // 共有見出しの構成（両方かつ each 以外）。sub=true は小さめ表示。row=左右並び。
   const capSharedTitleParts: { text: string; sub: boolean }[] = !capBoth
     ? []
@@ -1904,11 +1957,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const capJa = cap ? descJa(cap) : undefined;
     const capEn = cap ? descEn(cap) : undefined;
     if (captionLang !== "none" && cap && (capJa || capEn)) {
-      const cols: { title: string; body: string }[] = [];
+      const cols: { title: string; body: string; lang: "ja" | "en" }[] = [];
       if ((captionLang === "ja" || captionLang === "both") && capJa)
-        cols.push({ title: cap.name, body: capJa }); // 標高はラベル側に出すので解説には入れない
+        cols.push({ title: cap.name, body: capJa, lang: "ja" }); // 標高はラベル側に出すので解説には入れない
       if ((captionLang === "en" || captionLang === "both") && capEn)
-        cols.push({ title: cap.nameEn || cap.name, body: capEn });
+        cols.push({ title: cap.nameEn || cap.name, body: capEn, lang: "en" });
       if (cols.length) {
         const titleFs = Math.round(L * 0.026 * captionTitleScale); // 解説タイトル
         const bodyFs = Math.round(L * 0.02 * captionBodyScale); // 解説本文
@@ -1983,8 +2036,68 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const sharedRow = captionTitleMode === "groupH" && both; // 左右並び
         const colHasTitle = !both || captionTitleMode === "each";
         const rowGap = Math.round(bodyFs * 0.9); // 縦並びの段間
-        // 各本文カラムの高さ（自前見出しを含む場合あり）。
-        const colBodyH = wrapped.map((w) => (colHasTitle ? titleLineH : 0) + w.lines.length * lineH);
+        // --- タグ（ピル）。山名と本文の間に差し込む。空なら一切描かない（既存と同じ）。 ---
+        const tagFs = Math.round(bodyFs * 0.82);
+        const tagPadX = Math.round(tagFs * 0.5);
+        const tagPillH = tagFs + Math.round(tagFs * 0.32) * 2;
+        const tagPillGap = Math.round(tagFs * 0.38);
+        const tagRadius = Math.round(tagPillH / 2);
+        const tagGapAbove = Math.round(bodyFs * 0.3);
+        const tagGapBelow = Math.round(bodyFs * 0.45);
+        const tagFont = `600 ${tagFs}px ${ffBody}`;
+        type PillRow = { t: string; w: number }[];
+        const layoutPills = (chips: string[], maxW: number): PillRow[] => {
+          ctx.font = tagFont;
+          const rows: PillRow[] = [];
+          let cur: PillRow = [];
+          let curW = 0;
+          for (const t of chips) {
+            const w = Math.ceil(ctx.measureText(t).width) + tagPadX * 2;
+            if (cur.length && curW + tagPillGap + w > maxW) { rows.push(cur); cur = []; curW = 0; }
+            if (cur.length) curW += tagPillGap;
+            cur.push({ t, w });
+            curW += w;
+          }
+          if (cur.length) rows.push(cur);
+          return rows;
+        };
+        const pillsH = (rows: PillRow[]) => (rows.length ? rows.length * tagPillH + (rows.length - 1) * tagPillGap : 0);
+        const drawPills = (rows: PillRow[], x: number, top: number) => {
+          if (!rows.length) return;
+          ctx.save();
+          ctx.shadowColor = "transparent";
+          const bg = captionColor === "#000000" ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.4)";
+          let yy = top;
+          for (const row of rows) {
+            let xx = x;
+            for (const { t, w } of row) {
+              ctx.fillStyle = bg;
+              ctx.beginPath();
+              ctx.roundRect(xx, yy, w, tagPillH, tagRadius);
+              ctx.fill();
+              ctx.fillStyle = captionColor;
+              ctx.font = tagFont;
+              ctx.textBaseline = "middle";
+              ctx.fillText(t, xx + tagPadX, yy + tagPillH / 2);
+              xx += w + tagPillGap;
+            }
+            yy += tagPillH + tagPillGap;
+          }
+          ctx.textBaseline = "alphabetic";
+          ctx.restore();
+        };
+        // タグ言語: 英語本文のときだけ英語、両方・日本語は日本語。
+        const tagLang: "ja" | "en" = captionLang === "en" ? "en" : "ja";
+        // タグの差し込み位置:
+        //  - 単一言語: 山名の下（カラム内）に表示。
+        //  - 両方かつ共有見出しモード: 見出しの下に1回表示。
+        //  - 両方かつ「本文ごと」(each): 各本文に見出しが付くのでタグは出さない。
+        const colTagRows = cols.map((_c, ci) => (colHasTitle && !both ? layoutPills(capChips(cap, tagLang), colWidths[ci]) : []));
+        const colTagH = colTagRows.map((rows) => (rows.length ? tagGapAbove + pillsH(rows) + tagGapBelow : 0));
+        const sharedTagRows = sharedParts.length ? layoutPills(capChips(cap, tagLang), blockW) : [];
+        const sharedTagH = sharedTagRows.length ? tagGapAbove + pillsH(sharedTagRows) : 0;
+        // 各本文カラムの高さ（自前見出し＋タグを含む場合あり）。
+        const colBodyH = wrapped.map((w, ci) => (colHasTitle ? titleLineH : 0) + colTagH[ci] + w.lines.length * lineH);
         // 共有見出しの高さ：左右並びは1行（大きい方）、上下並びは各行の合計。
         const sharedTitleH = sharedParts.length
           ? sharedRow
@@ -1995,6 +2108,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出し＋余白は上に加算。
         const bodyBlockH =
           sharedTitleH +
+          sharedTagH +
           sharedGap +
           (vertical ? colBodyH.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1) : Math.max(...colBodyH));
         const blockH = bodyBlockH;
@@ -2005,8 +2119,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.shadowColor = captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)";
         ctx.shadowBlur = Math.round(L * 0.004);
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
-        // 本文カラム（colHasTitle のとき自前見出し付き）を (cx, top) に描く。
-        const drawCol = (w: { title: string; lines: string[] }, cx: number, top: number) => {
+        // 本文カラム（colHasTitle のとき自前見出し＋タグ付き）を (cx, top) に描く。
+        const drawCol = (ci: number, cx: number, top: number) => {
+          const w = wrapped[ci];
           let ty = top;
           ctx.fillStyle = captionColor;
           if (colHasTitle) {
@@ -2014,6 +2129,12 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ctx.fillText(w.title, cx, ty + titleFs);
             ty += titleLineH;
           }
+          if (colHasTitle && colTagRows[ci].length) {
+            ty += tagGapAbove;
+            drawPills(colTagRows[ci], cx, ty);
+            ty += pillsH(colTagRows[ci]) + tagGapBelow;
+          }
+          ctx.fillStyle = captionColor;
           ctx.font = `400 ${bodyFs}px ${ffBody}`;
           for (const ln of w.lines) { ctx.fillText(ln, cx, ty + bodyFs); ty += lineH; }
         };
@@ -2048,19 +2169,25 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               ty += lineHFor(p.fs);
             }
           }
+          // 共有見出しモードのタグ（見出しの下・本文の上に一度だけ）。
+          if (sharedTagRows.length) {
+            ty += tagGapAbove;
+            drawPills(sharedTagRows, bx, ty);
+            ty += pillsH(sharedTagRows);
+          }
           ty += sharedGap; // 見出しと本文の間に余白
         }
         // 本文（縦＝積む / 横＝左右に並べる）
         if (vertical) {
-          wrapped.forEach((w, ci) => {
+          wrapped.forEach((_w, ci) => {
             if (ci > 0) ty += rowGap;
-            drawCol(w, bx, ty);
+            drawCol(ci, bx, ty);
             ty += colBodyH[ci];
           });
         } else {
           const top = ty;
-          wrapped.forEach((w, ci) => {
-            drawCol(w, bx + (ci === 0 ? 0 : colWidths[0] + colGap), top);
+          wrapped.forEach((_w, ci) => {
+            drawCol(ci, bx + (ci === 0 ? 0 : colWidths[0] + colGap), top);
           });
         }
         ctx.restore();
@@ -2074,6 +2201,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const sel = apiRef.current?.getPeakSelection() ?? [];
     const inFrame = sel.filter((p) => p.u >= 0 && p.u <= 1 && p.v >= 0 && p.v <= 1); // 写真枠内のみ
     const descMap = await loadMountainDescriptions();
+    const prefMap = new Map((await loadAllMountains()).map((m) => [m.id, m.prefecture]));
     const labels: ArLabel[] = inFrame.map((p) => {
       const d = descMap.get(p.id);
       return {
@@ -2084,11 +2212,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         dotV: p.v,
         labelU: p.u,
         labelV: Math.max(0.06, p.v - 0.12), // 名札は点の少し上を初期位置に
-        description: d?.extract,
-        descriptionShort: d?.extractShort,
-        descriptionEn: d?.extractEn,
-        descriptionEnShort: d?.extractEnShort,
-        nameEn: d?.nameEn,
+        description: d?.description_ja_long,
+        descriptionShort: d?.description_ja_short,
+        descriptionEn: d?.description_en_long,
+        descriptionEnShort: d?.description_en_short,
+        nameEn: d?.title_en,
+        prefecture: prefMap.get(p.id),
+        tagsJa: d?.tags_ja,
+        tagsEn: d?.tags_en,
         source: d?.url,
       };
     });
@@ -3127,6 +3258,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       width: `${captionW * 100}%`,
                       color: captionColor,
                       "--cap-sh": captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)",
+                      "--cap-tag-bg": captionColor === "#000000" ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.4)",
                     } as React.CSSProperties
                   }
                   onPointerDown={onCaptionDown}
@@ -3152,6 +3284,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       )}
                     </div>
                   )}
+                  {/* 共有見出しモードのタグ（見出しの下・本文の上） */}
+                  {capSharedTitleParts.length > 0 && capTagEls(capTagLang)}
                   <div className={`ar-cap-cols${capBoth && captionLayout === "vertical" ? " is-vertical" : ""}`}>
                     {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
                       <div
@@ -3159,6 +3293,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].name}</div>}
+                        {capColHasTitle && !capBoth && capTagEls(capTagLang)}
                         <p className="ar-caption-text">{descJa(arLabels[captionIdx])}</p>
                       </div>
                     )}
@@ -3177,6 +3312,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].nameEn || arLabels[captionIdx].name}</div>}
+                        {capColHasTitle && !capBoth && capTagEls(capTagLang)}
                         <p className="ar-caption-text">{descEn(arLabels[captionIdx])}</p>
                       </div>
                     )}
@@ -3344,6 +3480,32 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                                 </button>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {captionLang !== "none" && (
+                          <div className="ar-fs-row">
+                            <span>タグ</span>
+                            <div className="seg" role="group" aria-label="高さ・場所タグ">
+                              <button className={capShowElev ? "is-active" : ""} onClick={() => setCapShowElev((v) => !v)}>
+                                高さ
+                              </button>
+                              <button className={capShowLoc ? "is-active" : ""} onClick={() => setCapShowLoc((v) => !v)}>
+                                場所
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {captionLang !== "none" && (capItem?.tagsJa?.length ?? 0) > 0 && (
+                          <div className="ar-caption-pick">
+                            {capItem!.tagsJa!.map((t) => (
+                              <button
+                                key={t}
+                                className={`ar-cap-chip${capSelectedTags.includes(t) ? " is-on" : ""}`}
+                                onClick={() => toggleCapTag(t)}
+                              >
+                                {t}
+                              </button>
+                            ))}
                           </div>
                         )}
                         {captionLang === "both" && (

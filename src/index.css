@@ -1913,6 +1913,23 @@ body,
   align-items: baseline;
   gap: 0.4em;
 }
+/* タグ（ピル）。山名と本文の間。焼き込み（本文0.82倍・角丸ピル）と見た目を合わせる。 */
+.ar-cap-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(0.6cqmax * var(--cap-body-fs, 1));
+  margin: calc(0.6cqmax * var(--cap-body-fs, 1)) 0;
+}
+.ar-cap-tag {
+  font-family: var(--cap-body-ff, inherit);
+  font-size: calc(1.64cqmax * var(--cap-body-fs, 1));
+  line-height: 1;
+  padding: 0.34em 0.6em;
+  border-radius: 999px;
+  background: var(--cap-tag-bg, rgba(0, 0, 0, 0.4));
+  text-shadow: none;
+  white-space: nowrap;
+}
 .ar-caption-title b {
   font-size: 0.8em;
   font-weight: 600;
