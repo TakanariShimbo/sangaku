@@ -2569,24 +2569,24 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       </button>
     </div>
   );
-  // ④のみ: ドラッグの役割を切替（合わせる=向き / 動かす=写真パン）。
+  // ④のみ: ドラッグの役割を切替（編集=向き合わせ / 画像=写真パン）。⑤と同じ呼び名に揃える。
   const editModeToggle = (
     <div className="edit-mode-toggle" role="group" aria-label="操作モード">
       <button
         className={`emt-btn${arEditMode === "aim" ? " is-on" : ""}`}
-        title="合わせる（ドラッグで向き合わせ）"
+        title="編集（ドラッグで向きを合わせる）"
         onClick={() => setArEditMode("aim")}
       >
         <IconLocate size={15} />
-        合わせる
+        編集
       </button>
       <button
         className={`emt-btn${arEditMode === "move" ? " is-on" : ""}`}
-        title="動かす（ドラッグで写真を移動）"
+        title="画像（ドラッグで写真を移動）"
         onClick={() => setArEditMode("move")}
       >
         <IconMove size={15} />
-        動かす
+        画像
       </button>
     </div>
   );
@@ -3454,15 +3454,24 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     ? `「編集」で名札・解説をドラッグ配置、「画像」で写真をパン・拡大（切替で誤操作を防止）。解説の言語・幅・文字サイズも下で調整できます（${arLabels.length}件）。`
                     : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
                 )}
-                {/* 操作（編集/画像 切替・ズーム）はステージ操作なので常時表示。 */}
-                <div className="stage-controls">
-                  {exportModeToggle}
-                  {stageZoomControls}
-                </div>
-                {/* 焼き込み設定: ラベル / 解説 をタブで1つだけ表示。 */}
-                {arLabels.length > 0 &&
-                  dockTabs("arexport", [
-                    {
+                {/* 操作（編集/画像＋ズーム）・ラベル・解説 をタブで1つだけ表示。 */}
+                {dockTabs("arexport", [
+                  {
+                    id: "view",
+                    label: (
+                      <>
+                        <IconMove size={13} /> 操作
+                      </>
+                    ),
+                    content: (
+                      <div className="stage-controls">
+                        {exportModeToggle}
+                        {stageZoomControls}
+                      </div>
+                    ),
+                  },
+                  arLabels.length > 0
+                    ? {
                       id: "label",
                       label: "ラベル",
                       content: (
@@ -3543,8 +3552,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       )}
                         </>
                       ),
-                    },
-                    arLabels.some((l) => l.description)
+                    }
+                    : null,
+                  arLabels.some((l) => l.description)
                       ? {
                           id: "desc",
                           label: "解説",
@@ -3794,13 +3804,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     : "選んだ山名が写真に重なります。ドラッグで向き、スライダーで目線高さ／傾きを合わせ込みます。",
                 )
               : null}
-          {/* align のみ: ステージ操作（合わせる/動かす + ズーム）は常時表示 */}
-          {!simView && arLike && arStep === "align" && (
-            <div className="stage-controls">
-              {editModeToggle}
-              {stageZoomControls}
-            </div>
-          )}
           {/* セクションはタブで1つだけ表示 */}
           {simView
             ? dockTabs("sim", [
@@ -3822,7 +3825,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   : null,
               ])
             : dockTabs("align", [
-                viewTab,
+                {
+                  id: "view",
+                  label: <><IconMove size={13} /> 操作</>,
+                  content: (
+                    <>
+                      {arLike && arStep === "align" && (
+                        <div className="stage-controls">
+                          {editModeToggle}
+                          {stageZoomControls}
+                        </div>
+                      )}
+                      {dockControls}
+                    </>
+                  ),
+                },
                 {
                   id: "cam",
                   label: <><IconCamera size={13} /> カメラ設定</>,
