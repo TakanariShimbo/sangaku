@@ -1921,7 +1921,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           return { title: c.title, lines: wrapBody(c.body, colWidths[ci]) };
         });
         const both = cols.length > 1;
-        const titleFsSmall = Math.round(titleFs * 0.6); // まとめ表示の従（英）サイズ
+        // まとめ表示の従（英）サイズ。左右はスラッシュで繋ぐので差を小さめ(0.8)、上下は0.6。
+        const titleFsSmall = Math.round(titleFs * (captionTitleMode === "groupH" ? 0.8 : 0.6));
         const lineHFor = (fs: number) => Math.round(fs * 1.3);
         // 共有見出し（both かつ each 以外）。fs で大小、sharedRow で左右並び。
         // each・単一言語は各カラムに自前の見出しを付ける。
@@ -1945,7 +1946,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ? lineHFor(Math.max(...sharedParts.map((p) => p.fs)))
             : sharedParts.reduce((a, p) => a + lineHFor(p.fs), 0)
           : 0;
-        const sharedGap = sharedParts.length ? Math.round(bodyFs * 0.6) : 0; // 共有見出しと本文の間の余白
+        const sharedGap = sharedParts.length ? Math.round(bodyFs * 1.0) : 0; // 共有見出しと本文の間の余白
         // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出し＋余白は上に加算。
         const bodyBlockH =
           sharedTitleH +
@@ -1976,13 +1977,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         if (sharedParts.length) {
           ctx.fillStyle = captionColor;
           if (sharedRow) {
+            // 左右並び：ベースラインを大きい方に揃え、間にスラッシュ区切りを入れて横に並べる。
             const baseFs = Math.max(...sharedParts.map((p) => p.fs));
             const baseline = ty + baseFs;
-            const gap = Math.round(baseFs * 0.4);
+            const gap = Math.round(baseFs * 0.32);
             let cxp = bx;
             sharedParts.forEach((p, pi) => {
+              if (pi > 0) {
+                ctx.font = `700 ${baseFs}px ${ffTitle}`;
+                cxp += gap;
+                ctx.globalAlpha = 0.7; // スラッシュは少し控えめ（プレビューと一致）
+                ctx.fillText("/", cxp, baseline);
+                ctx.globalAlpha = 1;
+                cxp += ctx.measureText("/").width + gap;
+              }
               ctx.font = `700 ${p.fs}px ${ffTitle}`;
-              if (pi > 0) cxp += gap;
               ctx.fillText(p.text, cxp, baseline);
               cxp += ctx.measureText(p.text).width;
             });
@@ -3084,12 +3093,23 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   onPointerMove={onEditMove}
                   onPointerUp={onEditUp}
                 >
-                  {/* 共有見出し（両方かつ each 以外。上にまとめる。row=左右並び・sub=小さめ） */}
+                  {/* 共有見出し（両方かつ each 以外。上にまとめる。row=左右並び（スラッシュ区切り）・sub=小さめ） */}
                   {capSharedTitleParts.length > 0 && (
-                    <div className={`ar-cap-shared${capSharedRow ? " is-row" : ""}`}>
-                      {capSharedTitleParts.map((p, i) => (
-                        <div key={i} className={`ar-caption-title${p.sub ? " is-sub" : ""}`}>{p.text}</div>
-                      ))}
+                    <div
+                      className={`ar-cap-shared${capSharedRow ? " is-row" : ""}`}
+                      style={capSharedRow ? ({ "--cap-sub-ratio": 0.8 } as React.CSSProperties) : undefined}
+                    >
+                      {capSharedRow ? (
+                        <>
+                          <div className="ar-caption-title">{capName}</div>
+                          <div className="ar-caption-title ar-cap-sep">/</div>
+                          <div className="ar-caption-title is-sub">{capNameEn}</div>
+                        </>
+                      ) : (
+                        capSharedTitleParts.map((p, i) => (
+                          <div key={i} className={`ar-caption-title${p.sub ? " is-sub" : ""}`}>{p.text}</div>
+                        ))
+                      )}
                     </div>
                   )}
                   <div className={`ar-cap-cols${capBoth && captionLayout === "vertical" ? " is-vertical" : ""}`}>
