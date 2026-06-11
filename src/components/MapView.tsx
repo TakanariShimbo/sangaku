@@ -1900,7 +1900,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       if (cols.length) {
         const titleFs = Math.round(L * 0.026 * captionTitleScale); // 解説タイトル
         const bodyFs = Math.round(L * 0.02 * captionBodyScale); // 解説本文
-        const srcFs = Math.round(L * 0.013 * captionBodyScale); // 出典（本文に合わせる）
         const titleLineH = Math.round(titleFs * 1.3);
         const lineH = Math.round(bodyFs * 1.5);
         const blockW = Math.round(W * captionW);
@@ -1986,7 +1985,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           sharedTitleH +
           sharedGap +
           (vertical ? colBodyH.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1) : Math.max(...colBodyH));
-        const blockH = bodyBlockH + Math.round(srcFs * 2);
+        const blockH = bodyBlockH;
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
         const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
         // 影で可読性を確保（背景ボックスなし）。影は文字色の反対色（黒文字の白影は控えめ）。
@@ -2052,12 +2051,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             drawCol(w, bx + (ci === 0 ? 0 : colWidths[0] + colGap), top);
           });
         }
-        // 出典（1回、左下。少し薄く）
-        ctx.globalAlpha = 0.75;
-        ctx.fillStyle = captionColor;
-        ctx.font = `400 ${srcFs}px ${ffBody}`;
-        const srcText = captionLang === "en" ? "Auto-generated from facts (ref: Wikipedia et al.)" : "解説は事実をもとに自動生成（参考: Wikipedia ほか）";
-        ctx.fillText(srcText, bx, by + bodyBlockH + srcFs);
         ctx.restore();
       }
     }
@@ -3012,7 +3005,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 "--label-sub-fs": labelSubScale, // ラベル2段目（補足）
                 "--cap-title-fs": captionTitleScale, // 解説タイトル
                 "--cap-body-fs": captionBodyScale, // 解説本文
-                "--cap-src-fs": captionBodyScale, // 出典（本文に合わせる）
                 "--label-name-ff": roleFontStack(roleFonts.labelName), // 山名フォント
                 "--label-sub-ff": roleFontStack(roleFonts.labelSub), // 補足フォント
                 "--cap-title-ff": roleFontStack(roleFonts.captionTitle), // タイトルフォント
@@ -3174,11 +3166,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         <p className="ar-caption-text">{arLabels[captionIdx].descriptionEn}</p>
                       </div>
                     )}
-                  </div>
-                  <div className="ar-caption-src">
-                    {captionLang === "en"
-                      ? "Auto-generated from facts (ref: Wikipedia et al.)"
-                      : "解説は事実をもとに自動生成（参考: Wikipedia ほか）"}
                   </div>
                   {/* 4辺のリサイズハンドル。左右=横幅 / 上下=縦に伸ばすと幅が狭まる。文字サイズは固定。出力には出ない。 */}
                   {(["l", "r", "t", "b"] as const).map((s) => (
