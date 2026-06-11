@@ -121,8 +121,10 @@ type ArLabel = {
   dotV: number;
   labelU: number;
   labelV: number;
-  description?: string; // 解説（日本語）。キャプション・焼き込みに使う。
-  descriptionEn?: string; // 解説（英語）。
+  description?: string; // 解説（日本語・長め）。キャプション・焼き込みに使う。
+  descriptionShort?: string; // 解説（日本語・短め）。
+  descriptionEn?: string; // 解説（英語・長め）。
+  descriptionEnShort?: string; // 解説（英語・短め）。
   nameEn?: string; // 英名（例: Mt. Fuji）。
   source?: string; // 参考URL
 };
@@ -294,6 +296,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   //  ja     … 日本語の見出しだけを上に→その下に両本文
   //  en     … 英語の見出しだけを上に→その下に両本文
   const [captionTitleMode, setCaptionTitleMode] = useState<"each" | "groupV" | "groupH" | "ja" | "en">("each");
+  // 解説本文の長さ（長め=元の解説 / 短め=ショート版）。
+  const [captionLength, setCaptionLength] = useState<"long" | "short">("long");
+  // 選択中の長さに応じた解説本文を返す（短めが無ければ長めにフォールバック）。
+  const descJa = (lb: { description?: string; descriptionShort?: string }) =>
+    captionLength === "short" ? lb.descriptionShort || lb.description : lb.description;
+  const descEn = (lb: { descriptionEn?: string; descriptionEnShort?: string }) =>
+    captionLength === "short" ? lb.descriptionEnShort || lb.descriptionEn : lb.descriptionEn;
   // 解説プレビュー用の派生値（両方表示時の見出し構成）。焼き込み側のロジックと一致させる。
   const capItem = arLabels[captionIdx];
   const capBoth = captionLang === "both" && !!capItem?.description && !!capItem?.descriptionEn;
@@ -1890,13 +1899,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     }
 
     // 解説（可動ブロック・背景なし・影付き）。captionLang に応じ 日本語/英語/両方 を出す。両方は2カラム。
+    // 長さ（長め/短め）は captionLength で選ぶ。
     const cap = arLabels[captionIdx];
-    if (captionLang !== "none" && cap && (cap.description || cap.descriptionEn)) {
+    const capJa = cap ? descJa(cap) : undefined;
+    const capEn = cap ? descEn(cap) : undefined;
+    if (captionLang !== "none" && cap && (capJa || capEn)) {
       const cols: { title: string; body: string }[] = [];
-      if ((captionLang === "ja" || captionLang === "both") && cap.description)
-        cols.push({ title: cap.name, body: cap.description }); // 標高はラベル側に出すので解説には入れない
-      if ((captionLang === "en" || captionLang === "both") && cap.descriptionEn)
-        cols.push({ title: cap.nameEn || cap.name, body: cap.descriptionEn });
+      if ((captionLang === "ja" || captionLang === "both") && capJa)
+        cols.push({ title: cap.name, body: capJa }); // 標高はラベル側に出すので解説には入れない
+      if ((captionLang === "en" || captionLang === "both") && capEn)
+        cols.push({ title: cap.nameEn || cap.name, body: capEn });
       if (cols.length) {
         const titleFs = Math.round(L * 0.026 * captionTitleScale); // 解説タイトル
         const bodyFs = Math.round(L * 0.02 * captionBodyScale); // 解説本文
@@ -2073,7 +2085,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         labelU: p.u,
         labelV: Math.max(0.06, p.v - 0.12), // 名札は点の少し上を初期位置に
         description: d?.extract,
+        descriptionShort: d?.extractShort,
         descriptionEn: d?.extractEn,
+        descriptionEnShort: d?.extractEnShort,
         nameEn: d?.nameEn,
         source: d?.url,
       };
@@ -3145,7 +3159,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].name}</div>}
-                        <p className="ar-caption-text">{arLabels[captionIdx].description}</p>
+                        <p className="ar-caption-text">{descJa(arLabels[captionIdx])}</p>
                       </div>
                     )}
                     {capBoth && captionLayout === "horizontal" && (
@@ -3163,7 +3177,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].nameEn || arLabels[captionIdx].name}</div>}
-                        <p className="ar-caption-text">{arLabels[captionIdx].descriptionEn}</p>
+                        <p className="ar-caption-text">{descEn(arLabels[captionIdx])}</p>
                       </div>
                     )}
                   </div>
@@ -3320,6 +3334,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             ))}
                           </div>
                         </div>
+                        {captionLang !== "none" && (
+                          <div className="ar-fs-row">
+                            <span>長さ</span>
+                            <div className="seg" role="group" aria-label="解説の長さ">
+                              {([["短め", "short"], ["長め", "long"]] as [string, "short" | "long"][]).map(([lab, v]) => (
+                                <button key={v} className={captionLength === v ? "is-active" : ""} onClick={() => setCaptionLength(v)}>
+                                  {lab}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {captionLang === "both" && (
                           <div className="ar-fs-row">
                             <span>並べ方</span>

@@ -33,3 +33,6 @@ __pycache__/
 
 # Playwright CLI artifacts
 .playwright-cli/
+
+# 解説ショート版の並列生成テンポラリ（マージ後に削除する作業ファイル）
+scripts/_short/
