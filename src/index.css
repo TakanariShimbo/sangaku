@@ -2058,7 +2058,8 @@ body,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 0;
+  padding: 10px 0 6px;
+  border-top: 1px solid rgba(130, 150, 175, 0.16); /* 「操作」セクションと「設定」を区切る */
 }
 .ar-caption-pick {
   display: flex;

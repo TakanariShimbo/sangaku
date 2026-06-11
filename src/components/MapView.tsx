@@ -3186,10 +3186,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     ? `「編集」で名札・解説をドラッグ配置、「画像」で写真をパン・拡大（切替で誤操作を防止）。解説の言語・幅・文字サイズも下で調整できます（${arLabels.length}件）。`
                     : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
                 )}
-                <div className="stage-controls">
-                  {exportModeToggle}
-                  {stageZoomControls}
-                </div>
+                {/* 操作（編集/画像 切替・ズーム）。他フェーズと同様、案内の下に独立セクションで置く。 */}
+                {dockSection(
+                  "arexportview",
+                  <>
+                    <IconMove size={13} /> 操作
+                  </>,
+                  <div className="stage-controls">
+                    {exportModeToggle}
+                    {stageZoomControls}
+                  </div>,
+                )}
                 {/* 焼き込み設定: 山名ラベル・解説の表示、解説の取り上げ山、共通の文字サイズ。 */}
                 {arLabels.length > 0 && (
                   <div className="ar-caption-ctrl">
