@@ -253,11 +253,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 文字サイズ倍率（スライダーで連続調整）。役割ごとに独立。初期値はすべて 1.0。
-  //  labelScale        … 山名ラベルのサイズ。0.7〜2.0
+  //  labelNameScale    … ラベル1段目（山名）のサイズ。0.7〜2.0
+  //  labelSubScale     … ラベル2段目（Mt.ローマ字｜標高）のサイズ。0.7〜1.6
   //  captionTitleScale … 解説タイトルのサイズ。0.7〜2.0
   //  captionBodyScale  … 解説本文（＋出典）のサイズ。0.7〜1.6
   // 役割ごとの実サイズはテンプレート側で base × scale と計算する。
-  const [labelScale, setLabelScale] = useState(1);
+  const [labelNameScale, setLabelNameScale] = useState(1);
+  const [labelSubScale, setLabelSubScale] = useState(1);
   const [captionTitleScale, setCaptionTitleScale] = useState(1);
   const [captionBodyScale, setCaptionBodyScale] = useState(1);
   // 文字色。ラベルと解説で別々。
@@ -1714,8 +1716,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, W, H);
-    const nameFs = Math.round(L * 0.026 * labelScale); // 山名（大）
-    const subFs = Math.round(nameFs * 0.62); // Mt.ローマ字｜標高（小）
+    const nameFs = Math.round(L * 0.026 * labelNameScale); // 山名（1段目）
+    const subFs = Math.round(L * 0.026 * 0.62 * labelSubScale); // Mt.ローマ字｜標高（2段目）
     const F = "system-ui, -apple-system, sans-serif";
     ctx.textBaseline = "alphabetic";
     if (bakeLabels) {
@@ -2793,7 +2795,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             onWheel={onStageWheel}
             style={
               {
-                "--label-fs": labelScale, // 山名ラベル
+                "--label-name-fs": labelNameScale, // ラベル1段目（山名）
+                "--label-sub-fs": labelSubScale, // ラベル2段目（補足）
                 "--cap-title-fs": captionTitleScale, // 解説タイトル
                 "--cap-body-fs": captionBodyScale, // 解説本文
                 "--cap-src-fs": captionBodyScale, // 出典（本文に合わせる）
@@ -2988,9 +2991,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 {/* 焼き込み設定: 山名ラベル・解説の表示、解説の取り上げ山、共通の文字サイズ。 */}
                 {arLabels.length > 0 && (
                   <div className="ar-caption-ctrl">
-                    {/* === 山名ラベル（折りたたみ） === */}
+                    {/* === ラベル（折りたたみ） === */}
                     <details className="ar-sec" open>
-                      <summary>山名ラベル</summary>
+                      <summary>ラベル</summary>
                       <label className="switch-row">
                         <span>写真に山名を入れる</span>
                         <input
@@ -3013,8 +3016,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             </div>
                           </div>
                           <div className="ar-fs-slider-row">
-                            <span>ラベルのサイズ</span>
-                            <span className="ar-fs-val">{Math.round(labelScale * 100)}%</span>
+                            <span>1段目のサイズ</span>
+                            <span className="ar-fs-val">{Math.round(labelNameScale * 100)}%</span>
                           </div>
                           <input
                             type="range"
@@ -3022,9 +3025,23 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             min={0.7}
                             max={2.0}
                             step={0.05}
-                            value={labelScale}
-                            onChange={(e) => setLabelScale(Number(e.target.value))}
-                            aria-label="ラベルのサイズ"
+                            value={labelNameScale}
+                            onChange={(e) => setLabelNameScale(Number(e.target.value))}
+                            aria-label="ラベル1段目のサイズ"
+                          />
+                          <div className="ar-fs-slider-row">
+                            <span>2段目のサイズ</span>
+                            <span className="ar-fs-val">{Math.round(labelSubScale * 100)}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            className="ar-fs-slider"
+                            min={0.7}
+                            max={1.6}
+                            step={0.05}
+                            value={labelSubScale}
+                            onChange={(e) => setLabelSubScale(Number(e.target.value))}
+                            aria-label="ラベル2段目のサイズ"
                           />
                         </>
                       )}

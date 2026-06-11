@@ -1776,13 +1776,13 @@ body,
   pointer-events: none;
 }
 .ar-label-name {
-  font-size: calc(2.7cqmax * var(--label-fs, 1));
+  font-size: calc(2.7cqmax * var(--label-name-fs, 1));
   font-weight: 700;
   letter-spacing: 0.01em;
 }
 .ar-label-sub {
   margin-top: 0.15em;
-  font-size: calc(1.55cqmax * var(--label-fs, 1));
+  font-size: calc(1.55cqmax * var(--label-sub-fs, 1));
   font-weight: 500;
   opacity: 0.92;
 }
