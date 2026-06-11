@@ -140,7 +140,7 @@ const FONT_PAIRS: Record<FontPairId, FontPair> = {
   gothic: { label: "ゴシック", jp: "Noto Sans JP", en: "Inter" },
   rounded: { label: "丸ゴシック", jp: "M PLUS Rounded 1c", en: "Nunito" },
   mincho: { label: "明朝", jp: "Noto Serif JP", en: "Noto Serif" },
-  script: { label: "筆記", jp: "Yuji Syuku", en: "Cormorant Garamond" },
+  script: { label: "筆記", jp: "Yuji Syuku", en: "Great Vibes" },
 };
 const FONT_PAIR_IDS = Object.keys(FONT_PAIRS) as FontPairId[];
 // 初期フォント（全役割ともゴシック）。
