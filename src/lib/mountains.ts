@@ -25,8 +25,10 @@ export type MountainHit = {
 // 山の解説（事実ベースでAI生成）。id で引く。本体が重いのでARなどで遅延ロード。
 export type MountainDescription = {
   title: string; // 山名（日本語）
-  extract: string; // 日本語解説
-  extractEn?: string; // 英語解説
+  extract: string; // 日本語解説（長め）
+  extractShort?: string; // 日本語解説（短め）
+  extractEn?: string; // 英語解説（長め）
+  extractEnShort?: string; // 英語解説（短め）
   nameEn?: string; // 英名（例: Mt. Fuji）
   url?: string; // 参考URL
 };
@@ -79,11 +81,19 @@ export async function loadMountainDescriptions(): Promise<Map<number, MountainDe
   const url = `${import.meta.env.BASE_URL}data/mountain_descriptions.json`;
   descLoading = fetch(url)
     .then((r) => (r.ok ? r.json() : { descriptions: {} }))
-    .then((d: { descriptions?: Record<string, { title: string; extract: string; extract_en?: string; name_en?: string; url?: string }> }) => {
+    .then((d: { descriptions?: Record<string, { title: string; extract: string; extract_short?: string; extract_en?: string; extract_en_short?: string; name_en?: string; url?: string }> }) => {
       const map = new Map<number, MountainDescription>();
       for (const [id, v] of Object.entries(d.descriptions ?? {})) {
         if (v?.extract)
-          map.set(Number(id), { title: v.title, extract: v.extract, extractEn: v.extract_en, nameEn: v.name_en, url: v.url });
+          map.set(Number(id), {
+            title: v.title,
+            extract: v.extract,
+            extractShort: v.extract_short,
+            extractEn: v.extract_en,
+            extractEnShort: v.extract_en_short,
+            nameEn: v.name_en,
+            url: v.url,
+          });
       }
       descCache = map;
       return map;
