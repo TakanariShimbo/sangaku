@@ -348,6 +348,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const capNameEn = capItem?.nameEn || capItem?.name || "";
   // 各本文に自前の見出しを付けるか（本文ごと、または単一言語のとき）。
   const capColHasTitle = !capBoth || captionTitleMode === "each";
+  // タグ言語: 英語本文のときだけ英語、両方・日本語は日本語。
+  const capTagLang: "ja" | "en" = captionLang === "en" ? "en" : "ja";
   // タグ（ピル）プレビュー。指定言語のチップを並べる。空なら null。
   const capTagEls = (lang: "ja" | "en") => {
     if (!capItem) return null;
@@ -2084,11 +2086,15 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           ctx.textBaseline = "alphabetic";
           ctx.restore();
         };
-        // 各カラムのタグ行（自前見出しモードのときカラム内に差し込む）。言語はカラムに合わせる。
-        const colTagRows = cols.map((c, ci) => (colHasTitle ? layoutPills(capChips(cap, c.lang), colWidths[ci]) : []));
+        // タグ言語: 英語本文のときだけ英語、両方・日本語は日本語。
+        const tagLang: "ja" | "en" = captionLang === "en" ? "en" : "ja";
+        // タグの差し込み位置:
+        //  - 単一言語: 山名の下（カラム内）に表示。
+        //  - 両方かつ共有見出しモード: 見出しの下に1回表示。
+        //  - 両方かつ「本文ごと」(each): 各本文に見出しが付くのでタグは出さない。
+        const colTagRows = cols.map((_c, ci) => (colHasTitle && !both ? layoutPills(capChips(cap, tagLang), colWidths[ci]) : []));
         const colTagH = colTagRows.map((rows) => (rows.length ? tagGapAbove + pillsH(rows) + tagGapBelow : 0));
-        // 共有見出しモードのタグ（一度だけ、見出しの下）。言語はモードに応じる。
-        const sharedTagRows = sharedParts.length ? layoutPills(capChips(cap, captionTitleMode === "en" ? "en" : "ja"), blockW) : [];
+        const sharedTagRows = sharedParts.length ? layoutPills(capChips(cap, tagLang), blockW) : [];
         const sharedTagH = sharedTagRows.length ? tagGapAbove + pillsH(sharedTagRows) : 0;
         // 各本文カラムの高さ（自前見出し＋タグを含む場合あり）。
         const colBodyH = wrapped.map((w, ci) => (colHasTitle ? titleLineH : 0) + colTagH[ci] + w.lines.length * lineH);
@@ -3279,7 +3285,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     </div>
                   )}
                   {/* 共有見出しモードのタグ（見出しの下・本文の上） */}
-                  {capSharedTitleParts.length > 0 && capTagEls(captionTitleMode === "en" ? "en" : "ja")}
+                  {capSharedTitleParts.length > 0 && capTagEls(capTagLang)}
                   <div className={`ar-cap-cols${capBoth && captionLayout === "vertical" ? " is-vertical" : ""}`}>
                     {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
                       <div
@@ -3287,7 +3293,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].name}</div>}
-                        {capColHasTitle && capTagEls("ja")}
+                        {capColHasTitle && !capBoth && capTagEls(capTagLang)}
                         <p className="ar-caption-text">{descJa(arLabels[captionIdx])}</p>
                       </div>
                     )}
@@ -3306,7 +3312,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         style={capBoth && captionLayout === "horizontal" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
                       >
                         {capColHasTitle && <div className="ar-caption-title">{arLabels[captionIdx].nameEn || arLabels[captionIdx].name}</div>}
-                        {capColHasTitle && capTagEls("en")}
+                        {capColHasTitle && !capBoth && capTagEls(capTagLang)}
                         <p className="ar-caption-text">{descEn(arLabels[captionIdx])}</p>
                       </div>
                     )}
