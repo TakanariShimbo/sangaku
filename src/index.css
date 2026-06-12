@@ -2331,3 +2331,252 @@ body,
   border-color: #8fd0ff;
 }
 
+
+/* ===================== 山の図鑑 ===================== */
+/* 一覧・詳細ともホームと同じ背景の全画面スクロール（.home を併用）。 */
+.zukan-inner {
+  width: min(860px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 34px;
+  padding-bottom: 40px;
+}
+/* 検索＋フィルタ＋ソートの操作列 */
+.zukan-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.zukan-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(20, 27, 38, 0.8);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  color: #9fb0c4;
+}
+.zukan-search input {
+  flex: 1;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: #e6edf5;
+  font-size: 14px;
+  outline: none;
+}
+.zukan-filters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .zukan-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.zukan-filters select {
+  height: 34px;
+  padding: 0 8px;
+  color: #e6edf5;
+  background: rgba(20, 27, 38, 0.8);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.zukan-count {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb0c4;
+  text-align: right;
+}
+/* カード一覧 */
+.zukan-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .zukan-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.zukan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 15px;
+  text-align: left;
+  color: #e6edf5;
+  background: rgba(20, 27, 38, 0.8);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.zukan-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143, 194, 255, 0.55);
+  background: rgba(26, 35, 49, 0.9);
+}
+.zukan-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.zukan-card-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+.zukan-card-elev {
+  flex: none;
+  font-size: 13px;
+  color: #ffd34d;
+  font-variant-numeric: tabular-nums;
+}
+.zukan-card-sub {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: #9fb0c4;
+}
+.zukan-card-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #c3cedd;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.zukan-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+/* タグ（ピル）。詳細はクリックで一覧の絞り込みに使える。 */
+.zukan-tag {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #cfe0f5;
+  background: rgba(63, 111, 176, 0.28);
+  border: 1px solid rgba(130, 165, 210, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.zukan-tag:hover {
+  background: rgba(63, 111, 176, 0.5);
+}
+.zukan-tag--mini {
+  padding: 1px 8px;
+  font-size: 11px;
+  cursor: inherit;
+}
+.zukan-more {
+  align-self: center;
+  padding: 9px 22px;
+  color: #e6edf5;
+  background: rgba(40, 52, 68, 0.6);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.zukan-more:hover {
+  background: rgba(54, 68, 86, 0.75);
+}
+.zukan-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0;
+  color: #9fb0c4;
+  font-size: 13px;
+}
+/* ---- 詳細ページ ---- */
+.zukan-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px 7px 10px;
+  color: #cdd6e2;
+  background: rgba(40, 52, 68, 0.6);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.zukan-back:hover {
+  background: rgba(54, 68, 86, 0.75);
+}
+/* 写真の代わりの3D周回ビュー（ヒーロー） */
+.zukan-orbit {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 52vh;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  background: #0a0d12;
+}
+.zukan-orbit canvas {
+  display: block;
+}
+.zukan-detail-head h1 {
+  margin: 0;
+  font-size: clamp(26px, 5vw, 36px);
+  letter-spacing: 0.03em;
+}
+.zukan-detail-sub {
+  display: flex;
+  gap: 14px;
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #9fb0c4;
+}
+.zukan-detail-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.zukan-fact {
+  padding: 5px 12px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(20, 27, 38, 0.8);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 9px;
+}
+.zukan-fact b {
+  color: #ffd34d;
+  font-variant-numeric: tabular-nums;
+}
+.zukan-fact--dim {
+  color: #9fb0c4;
+}
+.zukan-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zukan-desc {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  line-height: 1.9;
+  color: #d7e0ec;
+}
+.zukan-src {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb0c4;
+  word-break: break-all;
+}
+.zukan-src a {
+  color: #8fc2ff;
+}

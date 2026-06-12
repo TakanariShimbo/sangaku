@@ -99,6 +99,46 @@ export async function loadMountainDescriptions(): Promise<Map<number, MountainDe
   return descLoading;
 }
 
+// 図鑑のエントリ。山岳データ＋解説を id でマージした一覧表示用レコード。
+export type ZukanEntry = {
+  id: number;
+  name: string;
+  kana?: string; // 読み（ひらがな化済み。五十音ソート・検索用）
+  lat: number;
+  lon: number;
+  elevationM: number;
+  prefecture?: string;
+  priority: number; // 有名順ソート用
+  titleEn?: string; // 英名（例: Mt. Fuji）
+  descriptionJa?: string; // 解説（長め）
+  descriptionShortJa?: string; // 解説（短め。カード用）
+  tags: string[]; // タグ（日本語）
+  url?: string; // 参考URL
+};
+
+/** 図鑑用: 全山岳＋解説をマージして返す（どちらも一度ロードすればキャッシュ）。 */
+export async function loadZukanEntries(): Promise<ZukanEntry[]> {
+  const [list, descs] = await Promise.all([load(), loadMountainDescriptions()]);
+  return list.map((m) => {
+    const d = descs.get(m.id);
+    return {
+      id: m.id,
+      name: m.name,
+      kana: m.name_kana ? toHiragana(m.name_kana) : undefined,
+      lat: m.latitude,
+      lon: m.longitude,
+      elevationM: m.elevation_m,
+      prefecture: m.prefecture,
+      priority: m.priority,
+      titleEn: d?.title_en,
+      descriptionJa: d?.description_ja_long,
+      descriptionShortJa: d?.description_ja_short,
+      tags: d?.tags_ja ?? [],
+      url: d?.url,
+    };
+  });
+}
+
 /** 名前・読みで部分一致。重要度(priority)→標高の順で並べ、上位 limit 件を返す。 */
 export async function searchMountains(query: string, limit = 12): Promise<MountainHit[]> {
   const list = await load();

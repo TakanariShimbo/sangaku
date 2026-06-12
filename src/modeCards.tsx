@@ -1,9 +1,9 @@
 // ホーム画面のカード定義（一覧と、画面遷移の暗転カードで共用）。
-// 用途別モード（MapView）に加え、表示設定の専用画面もカードから入る。
-import { IconMountain, IconSun, IconImage, IconCamera, IconDownload, IconSettings } from "./components/icons";
+// 用途別モード（MapView）に加え、表示設定・図鑑の専用画面もカードから入る。
+import { IconMountain, IconSun, IconImage, IconCamera, IconDownload, IconSettings, IconBook } from "./components/icons";
 import type { AppMode } from "./App";
 
-export const CARDS: { mode: AppMode | "settings"; icon: React.ReactNode; title: string; desc: string }[] = [
+export const CARDS: { mode: AppMode | "settings" | "zukan"; icon: React.ReactNode; title: string; desc: string }[] = [
   {
     mode: "terrain",
     icon: <IconMountain size={26} />,
@@ -27,6 +27,12 @@ export const CARDS: { mode: AppMode | "settings"; icon: React.ReactNode; title: 
     icon: <IconCamera size={26} />,
     title: "カメラで山名を見る",
     desc: "目の前の山にカメラを向けると、見えている山の名前がその場でわかります",
+  },
+  {
+    mode: "zukan",
+    icon: <IconBook size={26} />,
+    title: "山の図鑑",
+    desc: "日本の山 1,061座。標高や地域、タグで絞り込み、3D地形と解説で山を知れます",
   },
   {
     mode: "offline",

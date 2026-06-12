@@ -2,14 +2,15 @@ import { useRef, useState } from "react";
 import Home from "./components/Home";
 import MapView from "./components/MapView";
 import SettingsScreen from "./components/SettingsScreen";
+import Zukan from "./components/Zukan";
 import { CARDS } from "./modeCards";
 import { useSettings } from "./settings";
 
 // 画面ルーター: ホーム → 各モード／設定。3Dエンジン(MapView)は共通で、appMode で用途別に振る舞いを切り替える。
 // terrain=地形 / celestial=太陽月 / ar=写真AR / live=カメラAR / offline=オフライン保存。
 export type AppMode = "terrain" | "celestial" | "ar" | "live" | "offline";
-// ホームのカードから入れる画面（モード＋設定）。設定はMapViewではなく専用画面。
-export type Screen = "home" | AppMode | "settings";
+// ホームのカードから入れる画面（モード＋設定＋図鑑）。設定・図鑑はMapViewではなく専用画面。
+export type Screen = "home" | AppMode | "settings" | "zukan";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -23,8 +24,8 @@ export default function App() {
   const navigate = (target: Screen) => {
     if (busyRef.current || target === screen) return;
     busyRef.current = true;
-    // 3D読込を伴うのはMapViewの各モードのみ。設定画面は読込なしで素早く開く。
-    const heavy = target !== "home" && target !== "settings";
+    // 3D読込を伴うのはMapViewの各モードのみ。設定・図鑑は読込なしで素早く開く（図鑑の3Dは詳細ページで遅延）。
+    const heavy = target !== "home" && target !== "settings" && target !== "zukan";
     // 入る時は行き先のカードを表示。ホームへ戻る時はカードなしでサッと暗転。
     const meta = target === "home" ? null : CARDS.find((c) => c.mode === target);
     setCard(meta ? { icon: meta.icon, title: meta.title, loading: heavy } : null);
@@ -48,6 +49,8 @@ export default function App() {
         <Home onSelect={navigate} />
       ) : screen === "settings" ? (
         <SettingsScreen settings={settings} onChangeSettings={setSettings} onHome={() => navigate("home")} />
+      ) : screen === "zukan" ? (
+        <Zukan onHome={() => navigate("home")} />
       ) : (
         <MapView appMode={screen} onHome={() => navigate("home")} settings={settings} />
       )}

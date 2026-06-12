@@ -28,6 +28,17 @@ export function IconMountain({ size = 16, className }: Props) {
   );
 }
 
+/** 本（図鑑）。山の図鑑モード用。 */
+export function IconBook({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M4 4.5 C4 3.7 4.7 3 5.5 3 H19 a1 1 0 0 1 1 1 V20 a1 1 0 0 1 -1 1 H5.5 C4.7 21 4 20.3 4 19.5 Z" />
+      <path d="M4 17.5 C4 16.7 4.7 16 5.5 16 H20" />
+      <path d="M8 7.5 H16 M8 11 H13.5" />
+    </svg>
+  );
+}
+
 /** 地図ピン。検索結果の土地名用。 */
 export function IconPin({ size = 16, className }: Props) {
   return (
