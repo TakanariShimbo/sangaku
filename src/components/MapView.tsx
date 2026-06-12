@@ -148,13 +148,10 @@ const PREF_EN: Record<string, string> = {
 const prefEn = (pref: string) =>
   pref.split("/").map((p) => PREF_EN[p.trim()] ?? p.trim().replace(/[県府都道]$/, "")).join(" / ");
 
-// 背景パネルの塗り色（文字色の反対色）。translucent=半透明 / solid=不透明。
-type BgPanel = "none" | "translucent" | "solid";
-const panelFill = (textColor: string, mode: "translucent" | "solid") => {
-  const dark = textColor !== "#000000"; // 白文字→濃色パネル、黒文字→淡色パネル
-  if (dark) return mode === "solid" ? "rgba(17,21,29,0.96)" : "rgba(17,21,29,0.42)";
-  return mode === "solid" ? "rgba(252,252,253,0.97)" : "rgba(255,255,255,0.55)";
-};
+// 背景パネルの塗り色（文字色の反対色・半透明）。
+type BgPanel = "none" | "translucent";
+const panelFill = (textColor: string) =>
+  textColor !== "#000000" ? "rgba(17,21,29,0.42)" : "rgba(255,255,255,0.55)"; // 白文字→濃色 / 黒文字→淡色
 const panelStroke = (textColor: string) => (textColor !== "#000000" ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)");
 
 // ラベルの内容パターン（1段目=主名／2段目=補足の組み合わせ）。
@@ -1928,13 +1925,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const ffSub = roleFontStack(roleFonts.labelSub);
     const ffTitle = roleFontStack(roleFonts.captionTitle);
     const ffBody = roleFontStack(roleFonts.captionBody);
-    // 背景パネルを描く（ドロップシャドウ＋角丸＋うっすら枠線）。文字の下に敷く。
-    const drawPanel = (x: number, y: number, w: number, h: number, r: number, textColor: string, mode: "translucent" | "solid") => {
+    // 背景パネルを描く（半透明＋ドロップシャドウ＋角丸＋うっすら枠線）。文字の下に敷く。
+    const drawPanel = (x: number, y: number, w: number, h: number, r: number, textColor: string) => {
       ctx.save();
-      ctx.shadowColor = mode === "solid" ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.26)";
+      ctx.shadowColor = "rgba(0,0,0,0.26)";
       ctx.shadowBlur = Math.round(L * 0.012);
       ctx.shadowOffsetY = Math.round(L * 0.0045);
-      ctx.fillStyle = panelFill(textColor, mode);
+      ctx.fillStyle = panelFill(textColor);
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, r);
       ctx.fill();
@@ -1997,7 +1994,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.globalAlpha = 1;
         // 背景パネル（選択枠と同じ範囲。文字の下に敷く）。
         if (labelBg !== "none") {
-          drawPanel(cx - boxW / 2 - padH, boxTop - padV, boxW + padH * 2, boxBottom - boxTop + padV * 2, Math.round(L * 0.011), labelColor, labelBg);
+          drawPanel(cx - boxW / 2 - padH, boxTop - padV, boxW + padH * 2, boxBottom - boxTop + padV * 2, Math.round(L * 0.011), labelColor);
         }
         // 文字（中央揃え・影は文字色の反対色で可読性確保。黒文字の白影は控えめ）
         ctx.save();
@@ -2181,7 +2178,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         // 背景パネル（本文ブロックの下に敷く）。
         if (captionBg !== "none") {
           const px = Math.round(L * 0.018), py = Math.round(L * 0.015);
-          drawPanel(bx - px, by - py, blockW + px * 2, bodyBlockH + py * 2, Math.round(L * 0.016), captionColor, captionBg);
+          drawPanel(bx - px, by - py, blockW + px * 2, bodyBlockH + py * 2, Math.round(L * 0.016), captionColor);
         }
         // 影で可読性を確保。影は文字色の反対色（黒文字の白影は控えめ）。
         ctx.save();
@@ -3370,7 +3367,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                           "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)",
                           ...(labelBg !== "none"
                             ? {
-                                "--label-panel-bg": panelFill(labelColor, labelBg),
+                                "--label-panel-bg": panelFill(labelColor),
                                 "--label-panel-bd": panelStroke(labelColor),
                               }
                             : {}),
@@ -3403,7 +3400,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       "--cap-tag-bg": captionColor === "#000000" ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.4)",
                       ...(captionBg !== "none"
                         ? {
-                            "--cap-panel-bg": panelFill(captionColor, captionBg),
+                            "--cap-panel-bg": panelFill(captionColor),
                             "--cap-panel-bd": panelStroke(captionColor),
                           }
                         : {}),
@@ -3554,7 +3551,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             <div className="ar-fs-row">
                               <span>背景パネル</span>
                               <div className="seg" role="group" aria-label="背景パネル">
-                                {([["なし", "none"], ["半透明", "translucent"], ["不透明", "solid"]] as [string, BgPanel][]).map(([lab, v]) => (
+                                {([["なし", "none"], ["半透明", "translucent"]] as [string, BgPanel][]).map(([lab, v]) => (
                                   <button key={v} className={labelBg === v ? "is-active" : ""} onClick={() => setLabelBg(v)}>
                                     {lab}
                                   </button>
@@ -3731,7 +3728,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             <div className="ar-fs-row">
                               <span>背景パネル</span>
                               <div className="seg" role="group" aria-label="背景パネル">
-                                {([["なし", "none"], ["半透明", "translucent"], ["不透明", "solid"]] as [string, BgPanel][]).map(([lab, v]) => (
+                                {([["なし", "none"], ["半透明", "translucent"]] as [string, BgPanel][]).map(([lab, v]) => (
                                   <button key={v} className={captionBg === v ? "is-active" : ""} onClick={() => setCaptionBg(v)}>
                                     {lab}
                                   </button>
