@@ -2435,7 +2435,7 @@ body,
 .zukan-card-elev {
   flex: none;
   font-size: 13px;
-  color: #ffd34d;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
 }
 .zukan-card-sub {
@@ -2579,7 +2579,7 @@ body,
   border-radius: 9px;
 }
 .zukan-fact b {
-  color: #ffd34d;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
 }
 .zukan-fact--dim {
