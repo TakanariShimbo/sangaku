@@ -1708,9 +1708,19 @@ body,
   background: #000;
   overflow: hidden;
   touch-action: none;
-  /* 文字サイズを写真（このステージ）の長辺基準にするためのコンテナ。
-     子は cqmax（=長辺の1%）で指定すると、画面サイズに依存せず写真比で一定になる。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 出力枠（フレーム）。切り抜き・余白・ふちを反映。px サイズは JS で contain 設定。
+   文字サイズの cqmax（=長辺の1%）基準＝この出力枠。 */
+.ar-frame {
+  position: relative;
+  overflow: hidden;
   container-type: size;
+}
+.ar-frame-photo {
+  position: absolute; /* 位置・サイズは inline（余白）。中の写真は inline（切り抜き）。 */
 }
 .ar-edit-photo {
   display: block;
@@ -1833,6 +1843,53 @@ body,
 .ar-caption:active {
   cursor: grabbing;
 }
+/* 切り抜き調整モード: フル写真＋ドラッグ枠を被せる層。 */
+.ar-crop-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+}
+.ar-crop-edit .ar-edit-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* 切り抜き枠（残す範囲。外側を暗く・破線アウトライン）。 */
+.ar-crop-rect {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  outline: 1px dashed rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 4;
+}
+/* 切り抜きハンドル（当たり判定は広め・見た目は中の四角）。 */
+.ar-crop-h {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 7;
+}
+.ar-crop-h::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 12px;
+  height: 12px;
+  background: rgba(143, 194, 255, 0.95);
+  border: 2px solid #fff;
+  border-radius: 3px;
+}
+.ar-crop-h--tl { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+.ar-crop-h--tr { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+.ar-crop-h--bl { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+.ar-crop-h--br { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
+.ar-crop-h--t { left: 50%; top: 0; transform: translate(-50%, -50%); cursor: ns-resize; }
+.ar-crop-h--b { left: 50%; bottom: 0; transform: translate(-50%, 50%); cursor: ns-resize; }
+.ar-crop-h--l { left: 0; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+.ar-crop-h--r { right: 0; top: 50%; transform: translate(50%, -50%); cursor: ew-resize; }
 /* 背景パネル（なし/半透明/不透明）。本文の下に敷く。 */
 .ar-caption.has-panel {
   isolation: isolate; /* ::before z-index:-1 を内部に閉じる */
