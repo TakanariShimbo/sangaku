@@ -2690,3 +2690,90 @@ body,
 .zukan-src a {
   color: #8fc2ff;
 }
+
+/* ===================== ホーム（ランディング）：おしゃれ寄せ ===================== */
+/* 黒地＋くすんだ金1色アクセント。設定・図鑑(.home)には影響させず .home--landing 限定。 */
+.home--landing {
+  background:
+    radial-gradient(1100px 620px at 50% -6%, rgba(214, 180, 106, 0.08), transparent 70%),
+    #0b0c0e;
+  color: #f3f0e9;
+}
+.home--landing .home-inner {
+  width: min(760px, 100%);
+  gap: clamp(40px, 9vh, 84px);
+  padding: clamp(56px, 13vh, 132px) 0 calc(72px + env(safe-area-inset-bottom, 0px));
+}
+/* ヒーロー：マーク → 巨大タイトル → トラッキングしたタグライン → 小さな説明 */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+.home-mark {
+  display: block;
+  margin-bottom: 2px;
+}
+.home-title {
+  margin: 0;
+  font-size: clamp(56px, 14vw, 108px);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.015em;
+  color: #f5f2ea;
+}
+.home-tagline {
+  margin: 0;
+  font-size: clamp(13px, 2.4vw, 17px);
+  font-weight: 500;
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+  color: #d6b46a;
+  padding-left: 0.46em; /* レター スペーシングの右余りを相殺して中央に見せる */
+}
+.home-lead {
+  margin: 8px 0 0;
+  max-width: 28em;
+  font-size: 14px;
+  line-height: 1.85;
+  color: #9c9a94;
+}
+/* カード：半透明・細い枠・影なし・大きめ角丸（SaaSテンプレ感を抑える） */
+.home--landing .home-cards {
+  gap: 14px;
+}
+.home--landing .home-card {
+  gap: 16px;
+  padding: 18px 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: none;
+  color: #f3f0e9;
+}
+.home--landing .home-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(214, 180, 106, 0.5);
+}
+.home--landing .home-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #d6b46a;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.home--landing .home-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f2ea;
+}
+.home--landing .home-card-desc {
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #8f8d86;
+}
