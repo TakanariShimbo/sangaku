@@ -87,7 +87,7 @@ body,
   padding: 2px 7px;
   color: #fff;
   background: rgba(48, 100, 160, 0.96);
-  border: 1px solid rgba(120, 180, 240, 0.7);
+  border: 1px solid rgba(214, 180, 106, 0.7);
   border-radius: 7px;
   text-shadow: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
@@ -146,7 +146,7 @@ body,
   gap: 8px;
   padding: 10px 12px 12px;
   color: #e6edf5;
-  background: rgba(14, 19, 27, 0.9);
+  background: rgba(13, 13, 15, 0.9);
   border: 1px solid rgba(130, 150, 175, 0.25);
   border-radius: 12px;
   backdrop-filter: blur(8px);
@@ -190,7 +190,7 @@ body,
 .topbar-btn.is-active {
   color: #fff;
   background: rgba(48, 100, 160, 0.92);
-  border-color: rgba(120, 180, 240, 0.65);
+  border-color: rgba(214, 180, 106, 0.65);
 }
 
 /* 地図↔風景の切替を隠す暗転フェード。最前面で全画面を覆い、切替中だけ黒くして切替先カードを出す。 */
@@ -201,7 +201,7 @@ body,
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(720px 520px at 50% 40%, rgba(70, 110, 170, 0.2), transparent 70%),
+    radial-gradient(720px 520px at 50% 40%, rgba(150, 130, 95, 0.2), transparent 70%),
     linear-gradient(180deg, #0c1118 0%, #0a0d12 100%);
   opacity: 0;
   pointer-events: none;
@@ -219,7 +219,7 @@ body,
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(720px 520px at 50% 40%, rgba(70, 110, 170, 0.2), transparent 70%),
+    radial-gradient(720px 520px at 50% 40%, rgba(150, 130, 95, 0.2), transparent 70%),
     linear-gradient(180deg, #0c1118 0%, #0a0d12 100%);
   opacity: 0;
   pointer-events: none;
@@ -257,7 +257,7 @@ body,
   height: 64px;
   border-radius: 18px;
   color: #cfe0f7;
-  background: linear-gradient(160deg, rgba(86, 140, 205, 0.32), rgba(79, 134, 198, 0.16));
+  background: linear-gradient(160deg, rgba(150, 130, 95, 0.32), rgba(214, 180, 106, 0.16));
   box-shadow:
     inset 0 0 0 1px rgba(140, 190, 245, 0.22),
     0 12px 36px rgba(38, 84, 146, 0.42);
@@ -295,7 +295,7 @@ body,
 }
 .fade-pill-ico {
   display: inline-flex;
-  color: #bcd6f5;
+  color: #ece3cf;
 }
 @keyframes fade-pill-pulse {
   0%,
@@ -345,17 +345,17 @@ body,
 }
 .fade-step.is-current {
   color: #fff;
-  background: #4f86c6;
+  background: #d6b46a;
   transform: scale(1.15);
   animation: fade-step-pulse 1.2s ease-in-out infinite;
 }
 @keyframes fade-step-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(79, 134, 198, 0.5);
+    box-shadow: 0 0 0 0 rgba(214, 180, 106, 0.5);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(79, 134, 198, 0);
+    box-shadow: 0 0 0 7px rgba(214, 180, 106, 0);
   }
 }
 .fade-steps-name {
@@ -410,7 +410,7 @@ body,
   gap: 8px;
   padding: 12px 14px;
   color: #e6edf5;
-  background: rgba(14, 19, 27, 0.86);
+  background: rgba(13, 13, 15, 0.86);
   border: 1px solid rgba(130, 150, 175, 0.25);
   border-radius: 12px;
   backdrop-filter: blur(8px);
@@ -449,8 +449,8 @@ body,
   cursor: pointer;
 }
 .seg button.is-active {
-  color: #fff;
-  background: rgba(56, 120, 200, 0.85);
+  color: #1a1206;
+  background: #d6b46a;
 }
 /* 全幅セグメント（検索モード・ベースマップ）。等幅で並ぶ。 */
 .seg--fill {
@@ -482,8 +482,8 @@ body,
   cursor: default;
 }
 .dock-btn.is-active {
-  color: #fff;
-  background: rgba(56, 120, 200, 0.85);
+  color: #1a1206;
+  background: #d6b46a;
   border-color: transparent;
 }
 /* ドック本体のセクション（見出し＋区切り線）。ボリュームのある中身を整理。 */
@@ -538,8 +538,8 @@ body,
   color: #cdd6e2;
 }
 .dock-tab.is-active {
-  color: #eaf1fb;
-  border-bottom-color: rgb(143, 194, 255); /* アクセントの下線でアクティブを表示 */
+  color: #f3ead2;
+  border-bottom-color: #d6b46a; /* アクセントの下線でアクティブを表示 */
 }
 .dock-tab-body {
   display: flex;
@@ -627,8 +627,8 @@ body,
   cursor: pointer;
 }
 .emt-btn.is-on {
-  color: #fff;
-  background: rgba(56, 120, 200, 0.85);
+  color: #1a1206;
+  background: #d6b46a;
 }
 .stage-zoom {
   display: inline-flex;
@@ -667,7 +667,7 @@ body,
 }
 .cam-eye input[type="range"] {
   width: 100%;
-  accent-color: #4f86c6;
+  accent-color: #d6b46a;
 }
 .cam-hint {
   font-size: 11px;
@@ -695,13 +695,13 @@ body,
   padding: 0 12px;
   font-size: 12px;
   color: #e6edf5;
-  background: rgba(79, 134, 198, 0.22);
+  background: rgba(214, 180, 106, 0.22);
   border: 1px solid rgba(130, 150, 175, 0.35);
   border-radius: 8px;
   cursor: pointer;
 }
 .cam-photo-pick:hover {
-  background: rgba(79, 134, 198, 0.34);
+  background: rgba(214, 180, 106, 0.34);
 }
 
 /* ホームへ戻る（左上・メニューの右） */
@@ -847,7 +847,7 @@ body,
 .side-toggle input {
   width: 16px;
   height: 16px;
-  accent-color: #4f86c6;
+  accent-color: #d6b46a;
 }
 
 /* --- トグルスイッチ行（表示・太陽月） --- */
@@ -885,7 +885,7 @@ body,
   transition: left 0.15s;
 }
 .switch:checked {
-  background: #4f86c6;
+  background: #d6b46a;
 }
 .switch:checked::after {
   left: 18px;
@@ -909,7 +909,7 @@ body,
 }
 .slider-row input[type="range"] {
   width: 100%;
-  accent-color: #4f86c6;
+  accent-color: #d6b46a;
 }
 
 /* --- 日時行（太陽・月） --- */
@@ -953,7 +953,7 @@ body,
 }
 .dt-slider {
   width: 100%;
-  accent-color: #4f86c6;
+  accent-color: #d6b46a;
 }
 
 /* --- 太陽・月の情報カード --- */
@@ -1016,7 +1016,7 @@ body,
 }
 .moon-cyc.is-now {
   opacity: 1;
-  background: rgba(79, 134, 198, 0.28);
+  background: rgba(214, 180, 106, 0.28);
   box-shadow: inset 0 0 0 1px rgba(130, 185, 240, 0.6);
 }
 
@@ -1033,7 +1033,7 @@ body,
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(14, 19, 27, 0.9);
+  background: rgba(13, 13, 15, 0.9);
   border: 1px solid rgba(130, 150, 175, 0.28);
   border-radius: 10px;
   padding: 4px;
@@ -1103,7 +1103,7 @@ body,
   width: 16px;
   height: 16px;
   border: 2px solid rgba(207, 224, 245, 0.28);
-  border-top-color: #cfe0f5;
+  border-top-color: #ece3cf;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -1118,7 +1118,7 @@ body,
   padding: 4px;
   max-height: 50vh;
   overflow-y: auto;
-  background: rgba(14, 19, 27, 0.96);
+  background: rgba(13, 13, 15, 0.96);
   border: 1px solid rgba(130, 150, 175, 0.25);
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -1177,7 +1177,7 @@ body,
 }
 .save-field input[type="range"] {
   width: 100%;
-  accent-color: #4f86c6;
+  accent-color: #d6b46a;
 }
 
 .save-center {
@@ -1210,7 +1210,7 @@ body,
 }
 .save-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3f6fb0, #5bd6ff);
+  background: linear-gradient(90deg, #b0863a, #e3c483);
   transition: width 0.15s;
 }
 .save-prog-text {
@@ -1248,7 +1248,7 @@ body,
 }
 .save-btn--primary {
   background: rgba(48, 100, 160, 0.92);
-  border-color: rgba(120, 180, 240, 0.6);
+  border-color: rgba(214, 180, 106, 0.6);
 }
 .save-btn--primary:hover:not(:disabled) {
   background: rgba(60, 120, 185, 0.95);
@@ -1355,7 +1355,7 @@ body,
 }
 .home-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(120, 180, 240, 0.6);
+  border-color: rgba(214, 180, 106, 0.6);
   background: rgba(28, 38, 54, 0.9);
 }
 .home-card-icon {
@@ -1366,8 +1366,8 @@ body,
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  color: #bcd6f5;
-  background: rgba(79, 134, 198, 0.2);
+  color: #ece3cf;
+  background: rgba(214, 180, 106, 0.2);
 }
 .home-card-text {
   display: flex;
@@ -1434,7 +1434,7 @@ body,
   padding: 28px 24px;
   text-align: center;
   color: #e6edf5;
-  background: rgba(14, 19, 27, 0.92);
+  background: rgba(13, 13, 15, 0.92);
   border: 1px solid rgba(130, 150, 175, 0.3);
   border-radius: 16px;
   backdrop-filter: blur(8px);
@@ -1448,8 +1448,8 @@ body,
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  color: #bcd6f5;
-  background: rgba(79, 134, 198, 0.2);
+  color: #ece3cf;
+  background: rgba(214, 180, 106, 0.2);
 }
 .ar-intro h2 {
   margin: 0;
@@ -1470,8 +1470,8 @@ body,
   font-size: 14px;
   font-weight: 600;
   color: #fff;
-  background: rgba(79, 134, 198, 0.9);
-  border: 1px solid rgba(120, 180, 240, 0.6);
+  background: rgba(214, 180, 106, 0.9);
+  border: 1px solid rgba(214, 180, 106, 0.6);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -1493,7 +1493,7 @@ body,
   gap: 10px;
   padding: 10px 14px 12px;
   color: #e6edf5;
-  background: rgba(14, 19, 27, 0.92);
+  background: rgba(13, 13, 15, 0.92);
   border: 1px solid rgba(130, 150, 175, 0.28);
   border-radius: 14px;
   backdrop-filter: blur(8px);
@@ -1604,18 +1604,18 @@ body,
   color: #cdd6e2;
 }
 .ar-step.is-active {
-  color: #eaf2fb;
+  color: #f3ead2;
 }
 .ar-step.is-active b {
-  background: #4f86c6;
-  color: #fff;
+  background: #d6b46a;
+  color: #1a1206;
 }
 .ar-step.is-done {
   color: #9fb0c4;
 }
 .ar-step.is-done b {
-  background: rgba(79, 134, 198, 0.45);
-  color: #eaf2fb;
+  background: rgba(255, 255, 255, 0.18);
+  color: #f3ead2;
 }
 /* スマホ等の狭い画面: 進行表示は番号の丸だけにし、現在ステップのみラベルを出す（1行に収める） */
 @media (max-width: 560px) {
@@ -1656,14 +1656,14 @@ body,
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
-  color: #fff;
-  background: rgba(79, 134, 198, 0.95);
-  border: 1px solid rgba(120, 180, 240, 0.6);
+  color: #1a1206;
+  background: #d6b46a;
+  border: 1px solid rgba(214, 180, 106, 0.9);
   border-radius: 10px;
   cursor: pointer;
 }
 .ar-btn-main:hover {
-  background: rgba(94, 150, 214, 1);
+  background: #e3c483;
 }
 .ar-btn-main:disabled {
   opacity: 0.45;
@@ -1703,7 +1703,7 @@ body,
   gap: 12px;
   padding: 22px 22px 18px;
   color: #e6edf5;
-  background: rgba(14, 19, 27, 0.93);
+  background: rgba(13, 13, 15, 0.93);
   border: 1px solid rgba(130, 150, 175, 0.3);
   border-radius: 16px;
   backdrop-filter: blur(8px);
@@ -1814,7 +1814,7 @@ body,
   position: absolute;
   inset: 11.5px; /* 解説ハンドルと同じ青ドット・小さめ。色は不透明、透過は親layerでまとめて掛ける */
   border-radius: 50%;
-  background: rgb(143, 194, 255);
+  background: rgb(214, 180, 106);
 }
 .ar-edit-dot:active {
   cursor: grabbing;
@@ -1847,7 +1847,7 @@ body,
   position: absolute;
   /* 上下 0.8cqmax・左右 1.2cqmax で四辺を均等に余白。点は枠の辺上に置く。 */
   inset: -0.8cqmax -1.2cqmax;
-  border: 0.2cqmax solid rgba(143, 194, 255, 0.6);
+  border: 0.2cqmax solid rgba(214, 180, 106, 0.6);
   border-radius: 0.8cqmax;
   pointer-events: none;
 }
@@ -1926,7 +1926,7 @@ body,
   margin: auto;
   width: 12px;
   height: 12px;
-  background: rgba(143, 194, 255, 0.95);
+  background: rgba(214, 180, 106, 0.95);
   border: 2px solid #fff;
   border-radius: 3px;
 }
@@ -1973,7 +1973,7 @@ body,
   content: "";
   position: absolute;
   inset: -1cqmax;
-  border: 0.2cqmax solid rgba(143, 194, 255, 0.6);
+  border: 0.2cqmax solid rgba(214, 180, 106, 0.6);
   border-radius: 1cqmax;
   pointer-events: none;
 }
@@ -1993,7 +1993,7 @@ body,
   margin: auto;
   width: clamp(7px, 1.5cqmax, 11px);
   height: clamp(7px, 1.5cqmax, 11px);
-  background: rgba(143, 194, 255, 0.6);
+  background: rgba(214, 180, 106, 0.6);
   border-radius: 50%;
 }
 .ar-cap-handle--l {
@@ -2045,7 +2045,7 @@ body,
   min-width: 1px;
   margin: 0 1.7%; /* 焼き込みの colGap(≈3.5%) と一致 */
   align-self: stretch;
-  background: rgba(143, 194, 255, 0.55);
+  background: rgba(214, 180, 106, 0.55);
   border-radius: 1px;
   cursor: ew-resize;
   touch-action: none;
@@ -2059,7 +2059,7 @@ body,
   transform: translate(-50%, -50%);
   width: clamp(7px, 1.5cqmax, 11px);
   height: clamp(7px, 1.5cqmax, 11px);
-  background: rgba(143, 194, 255, 0.6);
+  background: rgba(214, 180, 106, 0.6);
   border-radius: 50%;
 }
 /* 当たり判定を横に広げる（見た目は変えない）。 */
@@ -2106,7 +2106,7 @@ body,
 .ar-caption-title b {
   font-size: 0.8em;
   font-weight: 600;
-  color: #cfe0f5;
+  color: #ece3cf;
 }
 /* 共有見出し（まとめ表示）。上下は縦積み、左右は1行（ベースライン揃え＋スラッシュ区切り）。 */
 .ar-cap-shared {
@@ -2285,8 +2285,8 @@ body,
 }
 .ar-cap-chip.is-on {
   color: #fff;
-  background: rgba(79, 134, 198, 0.55);
-  border-color: rgba(120, 180, 240, 0.7);
+  background: rgba(214, 180, 106, 0.55);
+  border-color: rgba(214, 180, 106, 0.7);
 }
 /* 山選択フェーズ: 決定バー内の選択数 */
 .ar-select-count {
@@ -2315,7 +2315,7 @@ body,
 }
 .compass-wedge {
   fill: rgba(95, 160, 230, 0.38);
-  stroke: rgba(120, 180, 240, 0.7);
+  stroke: rgba(214, 180, 106, 0.7);
   stroke-width: 0.6;
 }
 .compass-needle {
@@ -2361,8 +2361,8 @@ body,
 }
 .ar-follow-toggle.is-on {
   color: #0b1118;
-  background: #8fd0ff;
-  border-color: #8fd0ff;
+  background: #d6b46a;
+  border-color: #d6b46a;
 }
 
 
