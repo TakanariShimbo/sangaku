@@ -105,9 +105,9 @@ body,
   height: 38px;
   padding: 0 14px;
   font-size: 13px;
-  color: #e6edf5;
-  background: rgba(18, 24, 33, 0.82);
-  border: 1px solid rgba(130, 150, 175, 0.3);
+  color: #ece6d8;
+  background: rgba(16, 16, 18, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 10px;
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -115,10 +115,11 @@ body,
   z-index: 20;
 }
 .peak-clear:hover {
-  background: rgba(34, 46, 62, 0.9);
+  border-color: rgba(214, 180, 106, 0.6);
+  background: rgba(28, 26, 22, 0.9);
 }
 .peak-clear b {
-  color: #6cb0ff;
+  color: #d6b46a;
   font-weight: 600;
 }
 
@@ -2295,7 +2296,7 @@ body,
   padding: 0 6px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  color: #cdd6e2;
+  color: #ece6d8;
   white-space: nowrap;
 }
 
