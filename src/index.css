@@ -82,12 +82,12 @@ body,
   color: #f3f6fb;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.8);
 }
-/* 選択中の山名は青チップで強調（点の青と対応）。 */
+/* 選択中の山名は金チップで強調（点の白ハイライトと対応）。 */
 .peak-label.is-selected {
   padding: 2px 7px;
-  color: #fff;
-  background: rgba(48, 100, 160, 0.96);
-  border: 1px solid rgba(214, 180, 106, 0.7);
+  color: #1a1206;
+  background: rgba(214, 180, 106, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 7px;
   text-shadow: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);

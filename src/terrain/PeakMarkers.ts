@@ -1,5 +1,5 @@
 // 山頂マーカー。全山頂（mountains.json）にオレンジの点を置き、タップ／クリックで選択した
-// 山だけ色を変える（複数選択可・選択は青）。山名ラベルは全山に表示し、選択した山は青で
+// 山だけ色を変える（複数選択可・選択は白）。山名ラベルは全山に表示し、選択した山は金チップで
 // 強調する（ラベルは MapView 側で DOM 描画）。カメラ視点では選択した山だけ残す。
 //
 // 座標系: X=東 / Y=上 / Z=南（mercator.ts と一致）。点サイズは sizeAttenuation:false で
@@ -45,7 +45,7 @@ export class PeakMarkers {
   private world: THREE.Vector3[] = [];
   private elevM: number[] = []; // VEX 変更時に Y を再計算するための素の標高
   private colors!: Float32Array; // RGBA（アルファで未選択点の表示/非表示を制御）
-  private hideUnselected = false; // カメラビュー時 true＝未選択(グレー)は隠し、選択(青)だけ出す
+  private hideUnselected = false; // カメラビュー時 true＝未選択は隠し、選択(白)だけ出す
   // 円盤クリップ（太陽・月モードで地形を丸く切り抜く際、外側の点・ラベルも隠す）。
   private clipActive = false;
   private clipX = 0;
@@ -137,7 +137,7 @@ export class PeakMarkers {
     this.geom.attributes.color.needsUpdate = true;
   }
 
-  /** カメラビューモード切替。true で未選択(グレー)点を隠し、選択(青)だけ表示する。 */
+  /** カメラビューモード切替。true で未選択点を隠し、選択(白)だけ表示する。 */
   setCameraMode(on: boolean): void {
     if (this.hideUnselected === on) return;
     this.hideUnselected = on;
