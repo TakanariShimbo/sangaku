@@ -2653,23 +2653,29 @@ body,
 }
 /* 詳細の縦リズム（.zukan-inner の gap:18px に margin を足して、
    画像↓32 → 山名↓12 → ふりがな↓28 → チップ↓20 → タグ↓32 → 日本語↓24 → 英語 にする）。 */
+/* 画像と山名はセットで見せたいので詰める（flex gap 18 を負マージンで相殺）。 */
 .zukan-detail-head {
-  margin-top: 14px; /* 画像 → 山名 = 32 */
+  margin-top: -4px; /* 画像 → 山名 ≈ 14 */
 }
 .zukan-detail-head h1 {
   margin: 0;
   font-size: clamp(30px, 6vw, 48px);
   font-weight: 700;
+  line-height: 1.05; /* 行間のリードを詰めて画像との一体感を出す */
   letter-spacing: -0.01em;
   color: var(--fg);
 }
-/* 読み・英名は同じ役割の“補足情報1行”。英語を目立たせず、行の高さも揃える。 */
+/* 読み・英名は同じ役割の“補足情報1行”。英名は補足なのでさらにトーンを落とす。 */
 .zukan-detail-sub {
   margin: 10px 0 0; /* 山名 → 補足行 */
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.58);
+}
+.zukan-sub-en {
+  opacity: 0.82; /* 英名は読み（かな）よりさらに控えめに */
 }
 .zukan-detail-facts {
   display: flex;
@@ -2690,13 +2696,13 @@ body,
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
-/* 座標は主情報ではないので、チップにせず弱い注記として添える。 */
-.zukan-fact--dim {
-  padding: 0 2px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  background: none;
-  border: none;
+/* 座標は主情報ではないので、チップ行の下に小さく・薄く・Mono で添える。 */
+.zukan-coords {
+  margin: 8px 0 0; /* チップ → 座標 */
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.36);
 }
 .zukan-tags {
   display: flex;
@@ -2733,27 +2739,31 @@ body,
 .zukan-desc-block {
   margin-top: 14px; /* タグ → 本文（gap18と合わせて約32） */
 }
+/* 本文は山名より一段控えめに（主従をつける）。 */
 .zukan-desc {
   margin: 0;
-  font-size: 16px;
-  line-height: 2;
-  color: rgba(245, 242, 234, 0.92);
+  font-size: 15.5px;
+  line-height: 1.95;
+  letter-spacing: 0.02em;
+  color: rgba(245, 242, 234, 0.9);
 }
-/* 言語の切り替わりを示す小さな Mono ラベル（EN）。線で区切らず、ラベルで“章”を示す。 */
+/* 言語ラベル（JA / EN）。日英あるとき対で出し、Mono の小さな“章見出し”に。 */
 .zukan-section-label {
-  margin: 28px 0 0; /* 日本語本文 → ラベル */
+  margin: 28px 0 8px; /* 前の本文 → ラベル / ラベル → 本文 */
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.16em;
-  color: rgba(214, 180, 106, 0.65);
+  color: rgba(214, 180, 106, 0.6);
 }
-/* 英語解説（ラベルの下）。淡いトーンで「同じ本文の続き」として読ませる。 */
+.zukan-section-label:first-child {
+  margin-top: 0; /* ブロック先頭(JA)はブロック側マージンに任せる */
+}
+/* 英語解説。淡いトーンで「同じ本文の続き」として読ませる。 */
 .zukan-desc--en {
-  margin-top: 10px; /* ラベル → 英語本文 */
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.8;
-  color: rgba(231, 226, 214, 0.7);
+  color: rgba(231, 226, 214, 0.66);
 }
 .zukan-src {
   margin: 0;
@@ -2860,7 +2870,6 @@ body,
 /* 数値・座標・%・ステップ番号など「データ」系は Mono で映像・解析ツール感を出す。 */
 .zukan-card-elev,
 .zukan-fact b,
-.zukan-fact--dim,
 .ar-fs-val,
 .slider-label b,
 .stage-zoom-val,

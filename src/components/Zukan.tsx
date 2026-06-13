@@ -192,18 +192,23 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
           <ZukanOrbit lat={selected.lat} lon={selected.lon} elevationM={selected.elevationM} />
           <header className="zukan-detail-head">
             <h1>{selected.name}</h1>
-            {/* 読み・英名は「同じ役割の補足情報」として1行に。/ で1まとまりに見せる。 */}
-            <p className="zukan-detail-sub">{[selected.kana, selected.titleEn].filter(Boolean).join("  /  ")}</p>
+            {/* 読み・英名は「同じ役割の補足情報1行」。英名は補足なのでさらにトーンを落とす。 */}
+            <p className="zukan-detail-sub">
+              {selected.kana}
+              {selected.kana && selected.titleEn && "  /  "}
+              {selected.titleEn && <span className="zukan-sub-en">{selected.titleEn}</span>}
+            </p>
           </header>
+          {/* 標高（最強）→所在地、座標は次行に逃がして弱い注記に。 */}
           <div className="zukan-detail-facts">
             <span className="zukan-fact">
               <b>{selected.elevationM.toLocaleString()}</b> m
             </span>
             {selected.prefecture && <span className="zukan-fact">{selected.prefecture.replace(/\//g, "・")}</span>}
-            <span className="zukan-fact zukan-fact--dim">
-              {selected.lat.toFixed(4)}, {selected.lon.toFixed(4)}
-            </span>
           </div>
+          <p className="zukan-coords">
+            {selected.lat.toFixed(4)}, {selected.lon.toFixed(4)}
+          </p>
           {selected.tags.length > 0 && (
             <div className="zukan-tags">
               {selected.tags.map((t) => (
@@ -223,7 +228,13 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
           )}
           {(selected.descriptionJa || selected.descriptionEn) && (
             <div className="zukan-desc-block">
-              {selected.descriptionJa && <p className="zukan-desc">{selected.descriptionJa}</p>}
+              {selected.descriptionJa && (
+                <>
+                  {/* 日英あるときだけ JA/EN を対にして、EN の孤立感をなくす。 */}
+                  {selected.descriptionEn && <p className="zukan-section-label">JA</p>}
+                  <p className="zukan-desc">{selected.descriptionJa}</p>
+                </>
+              )}
               {selected.descriptionEn && (
                 <>
                   <p className="zukan-section-label">EN</p>
